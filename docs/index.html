@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f7f6f2">
+  <meta name="description" content="Понятная инструкция по сборке шкафа Вилета 6, 120 × 40 × 210 см. Схемы, детали и сохранение вашего прогресса.">
+  <title>Вилета 6 — соберём по порядку</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="data.js" defer></script>
+  <script src="diagrams.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">К содержимому</a>
+  <header class="site-header">
+    <a class="brand" href="#" aria-label="Вилета 6 — начало"><span class="brand-symbol" aria-hidden="true"><i></i><i></i><i></i></span><span>Вилета <b>6</b></span></a>
+    <nav class="top-nav" aria-label="Главная навигация"><a href="#guide" data-nav="guide">Сборка</a><a href="#parts" data-nav="parts">Детали</a><button class="text-button" data-action="help">Помощь <span aria-hidden="true">↗</span></button></nav>
+    <a class="header-download" id="header-download" href="#sources">Исходная инструкция <span aria-hidden="true">↓</span></a>
+  </header>
+  <main id="main" tabindex="-1"></main>
+  <footer class="site-footer"><a class="brand footer-brand" href="#">Вилета <b>6</b></a><p>Один шкаф. Всё по порядку.</p><button class="text-button" data-action="sources">Об инструкции <span aria-hidden="true">↗</span></button></footer>
+  <dialog id="help-dialog" class="dialog"><div class="dialog-top"><span class="eyebrow">Под рукой</span><button class="icon-button" data-action="close-dialog" aria-label="Закрыть">×</button></div><div id="dialog-content"></div></dialog>
+  <dialog id="zoom-dialog" class="zoom-dialog"><div class="zoom-header"><span id="zoom-title">Схема сборки</span><div><button class="icon-button" data-action="zoom-out" aria-label="Уменьшить">−</button><span id="zoom-level">100%</span><button class="icon-button" data-action="zoom-in" aria-label="Увеличить">+</button><button class="icon-button" data-action="close-dialog" aria-label="Закрыть">×</button></div></div><div class="zoom-viewport"><div id="zoom-content"></div></div></dialog>
+  <div class="toast" id="toast" role="status"></div>
+</body>
+</html>

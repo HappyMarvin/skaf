@@ -1,0 +1,247 @@
+(() => {
+  'use strict';
+  const data = window.GUIDE;
+  const main = document.querySelector('#main');
+  const storageKey = 'vileta6-guide-v1';
+  let state = { current: '', completed: [], found: [] };
+  try { state = { ...state, ...JSON.parse(localStorage.getItem(storageKey) || '{}') }; } catch (_) {}
+  if (!Array.isArray(state.completed)) state.completed = [];
+  if (!Array.isArray(state.found)) state.found = [];
+  state.completed = [...new Set(state.completed.map(String))].filter(id => data.steps.some(s => String(s.id) === id));
+  state.found = [...new Set(state.found.map(String))].filter(id => data.parts.some(part => String(part.id) === id));
+  state.current = data.steps.some(step=>String(step.id)===String(state.current)) ? String(state.current) : '';
+  let zoom = 1;
+  let toastTimer;
+  const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const icon = (name, cls = '') => {
+    const paths = {
+      check: '<path d="m5 12 4 4L19 6"/>',
+      expand: '<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6"/>',
+      search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
+      floor: '<path d="m3 16 9-5 9 5-9 5-9-5Zm0-5 9-5 9 5M3 6l9-5 9 5"/>',
+      parts: '<path d="m3 8 9-5 9 5-9 5-9-5Zm0 0v10l9 5 9-5V8m-9 5v10M8 6l9 5"/>',
+      guide: '<path d="M3 4h7l2 2 2-2h7v16h-7l-2 2-2-2H3V4Zm9 2v16M6 8h3m-3 4h3m6-4h3m-3 4h3"/>',
+      help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4 2c-1 .7-1.5 1-1.5 3m0 3v.1"/>',
+      arrow: '<path d="M4 12h16m-6-6 6 6-6 6"/>'
+    };
+    return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.parts}</svg>`;
+  };
+  const save = () => { try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch (_) {} };
+  save();
+  const isDone = id => state.completed.includes(String(id));
+  const progress = () => data.steps.length ? Math.round(state.completed.length / data.steps.length * 100) : 0;
+  const stepUrl = id => `#step/${encodeURIComponent(id)}`;
+  const currentStep = () => data.steps.find(s => String(s.id) === String(state.current)) || data.steps[0];
+  const number = n => String(n).padStart(2, '0');
+  const quantityLabel = value => /^\d+(?:[.,]\d+)?$/.test(String(value)) ? `${escape(value)} шт.` : escape(value);
+  const diagramMarkup = step => {
+    const key = step.diagramKey || step.diagram;
+    if (window.renderDiagram && key && !/[./]/.test(key)) { const vector=window.renderDiagram(key); if(vector) return vector; }
+    return step.diagram ? `<img src="${escape(step.diagram)}" alt="${escape(step.diagramAlt || `Схема: ${step.title}`)}">` : `<div class="diagram-pending">${icon('guide')}<span>Схема из исходной инструкции</span></div>`;
+  };
+  const isVectorDiagram = step => { const key=step.diagramKey || step.diagram || ''; return Boolean(window.renderDiagram && key && !/[./]/.test(key) && window.renderDiagram(key)); };
+  const diagramCaption = () => 'Наглядная схема';
+  const sourceLabel = step => typeof step.source === 'string' ? escape(step.source) : step.source ? `${step.source.url ? `<a href="${escape(step.source.url)}" target="_blank" rel="noopener">${escape(step.source.label || 'Исходная инструкция')}</a>` : escape(step.source.label || 'Исходная инструкция')}${step.source.page ? ` · стр. ${escape(step.source.page)}` : ''}` : '';
+  const routeToStart = () => currentStep() ? stepUrl(currentStep().id) : '#guide';
+
+  function home() {
+    document.title = 'Вилета 6 — соберём по порядку';
+    const hasProgress = Boolean(state.current || state.completed.length);
+    main.innerHTML = `<div class="home"><section class="hero"><div class="hero-copy"><div class="eyebrow">Инструкция к вашему шкафу</div><h1>Ваш шкаф.<br><em>По шагам.</em></h1><p class="hero-description">От первой детали до последней дверцы.<br>Всё для сборки Вилеты 6 — в одном понятном руководстве.</p><a class="primary-button" href="${routeToStart()}">${hasProgress ? 'Продолжить сборку' : 'Начать сборку'}<span class="arrow" aria-hidden="true">→</span></a><div class="hero-meta"><span>${data.steps.length || 'Все'} ${data.steps.length ? 'этапов' : 'этапы'} сборки</span><span>Прогресс сохраняется</span></div>${hasProgress ? `<div class="resume-note"><span class="progress-dot"></span>Вы остановились на шаге ${data.steps.findIndex(s => String(s.id) === String(currentStep()?.id)) + 1} · выполнено ${state.completed.length} из ${data.steps.length}</div>` : ''}</div><div class="hero-visual"><img class="cabinet-svg" src="assets/hero-closed.svg" alt="Шкаф Вилета 6: три верхние и три длинные дверцы, ширина 120, глубина 40, высота 210 сантиметров"><div class="product-note"><strong>${escape(data.product.name)}</strong>${escape(data.product.dimensions)}<br>${escape(data.product.subtitle || '')}</div></div></section><div class="hero-bottom"><p><strong>Меньше догадок, больше ясности.</strong><br>Сверяйте детали, увеличивайте схемы и двигайтесь в своём темпе.</p><a class="small-link" href="#parts">Сначала проверить детали <span aria-hidden="true">↗</span></a></div><section class="section prep-section"><div class="section-heading"><div><span class="eyebrow">Перед первым шагом</span><h2>Подготовим место.</h2></div><p>Несколько простых действий,<br>чтобы сборка шла спокойно.</p></div><div class="prep-grid"><article class="prep-card">${icon('floor','line-icon')}<h3>Освободите пространство</h3><p>Разложите детали на ровной поверхности. Подстелите картон от упаковки, чтобы защитить пол и покрытие шкафа.</p></article><article class="prep-card">${icon('parts','line-icon')}<h3>Сверьте комплект</h3><p>Сравните панели и крепёж с ведомостью. Похожие детали удобнее разложить рядом и проверить по размерам.</p></article><article class="prep-card">${icon('guide','line-icon')}<h3>Держите схемы под рукой</h3><p>Любую схему можно увеличить. Ваша отметка о завершении шага сохранится в этом браузере.</p></article></div></section><section class="section" id="guide"><div class="section-heading"><div><span class="eyebrow">Вся сборка на виду</span><h2>У каждого шага — своя задача.</h2></div><p>Можно заглянуть в любой этап.<br>Прогресс изменится, когда вы отметите его готовым.</p></div><div class="journey-list">${data.steps.map((s,i) => `<a class="journey-item" href="${stepUrl(s.id)}"><span class="journey-number">${isDone(s.id) ? '✓' : number(i+1)}</span><span class="journey-title">${escape(s.title)}</span><span class="journey-arrow" aria-hidden="true">↗</span></a>`).join('')}</div></section></div>`;
+    if (location.hash === '#guide') requestAnimationFrame(() => document.querySelector('#guide')?.scrollIntoView({ behavior: 'smooth' }));
+  }
+
+  function itemMarkup(item) {
+    if (typeof item === 'string') return `<div class="part-chip"><span class="part-mini">—</span><span>${escape(item)}</span></div>`;
+    const reference = data.parts.find(part => String(part.id) === String(item.id));
+    const hardware = (item.kind || reference?.kind) === 'hardware';
+    return `<button class="part-chip" data-part-dialog="${escape(item.id)}"><span class="part-mini">${hardware ? hardwareArt(reference || item) : escape(item.id || '·')}</span><span>${escape(item.name || reference?.name || '')}${item.quantity ? ` <b class="item-quantity">× ${escape(item.quantity)}</b>` : ''}<small>${escape(item.size || item.description || reference?.size || '')}</small></span></button>`;
+  }
+
+  function stepPage(step) {
+    const index = data.steps.indexOf(step);
+    state.current = String(step.id); save();
+    document.title = `${index + 1}. ${step.title} — Вилета 6`;
+    main.innerHTML = `<div class="guide-shell"><aside class="guide-sidebar"><a class="back-link" href="#">← <span>К началу</span></a><h2 class="sidebar-product">${escape(data.product.name)}</h2><div class="sidebar-dimensions">${escape(data.product.dimensions)}</div><div class="progress-track"><div class="progress-fill" style="width:${progress()}%"></div></div><div class="progress-label"><span>Собираем по порядку</span><span>${state.completed.length} / ${data.steps.length}</span></div><nav class="step-nav" aria-label="Этапы сборки">${data.steps.map((s,i) => `<button data-step="${escape(s.id)}" class="${s === step ? 'current' : ''} ${isDone(s.id) ? 'done' : ''}" ${s === step ? 'aria-current="step"' : ''}><span class="step-nav-number">${isDone(s.id) ? '✓' : number(i+1)}</span><span>${escape(s.title)}</span></button>`).join('')}</nav><div class="sidebar-bottom">Прогресс сохранён в этом браузере.<button data-action="help">Нужна помощь? ↗</button></div></aside><article class="step-main"><div class="mobile-step-nav"><label for="mobile-steps">Все шаги</label><select id="mobile-steps" aria-label="Перейти к шагу">${data.steps.map((s,i) => `<option value="${escape(s.id)}" ${s === step ? 'selected' : ''}>${number(i+1)} · ${escape(s.title)}${isDone(s.id) ? ' ✓' : ''}</option>`).join('')}</select><span class="mobile-step-count">${index+1}/${data.steps.length}</span></div><div class="mobile-progress" style="width:${progress()}%"></div><div class="step-breadcrumb"><span>Инструкция по сборке</span><button data-action="help">${icon('help')} Нужна помощь?</button></div><div class="step-title-row"><div><div class="eyebrow">Шаг ${number(index+1)} из ${number(data.steps.length)}${step.eyebrow ? ` · ${escape(step.eyebrow)}` : ''}</div><h1>${escape(step.title)}</h1><p class="step-description">${escape(step.description || '')}</p></div><span class="step-counter" aria-hidden="true">${number(index+1)}</span></div>${step.warning ? `<div class="safety-note">${icon('help')}<p>${escape(step.warning)}</p></div>` : ''}<div class="assembly-layout"><div class="diagram-card">${diagramMarkup(step)}${sourceLabel(step) ? `<span class="diagram-source">${typeof step.source === 'object' && step.source.page ? `Исходная схема · стр. ${escape(step.source.page)}` : 'Схема из инструкции'}</span>` : ''}<button class="diagram-zoom" data-action="zoom">${icon('expand')} Увеличить</button></div><div class="step-details">${step.items?.length ? `<h2 class="step-aside-title">Понадобится</h2><div class="part-chips">${step.items.map(itemMarkup).join('')}</div><button class="part-help-link" data-action="part-help">Не уверены в детали? <span aria-hidden="true">↗</span></button>` : ''}<ol class="step-instructions">${(step.instructions || []).map(text => `<li>${escape(text)}</li>`).join('')}</ol></div></div>${step.checkpoint ? `<div class="checkpoint">${icon('check')}<div><h2>Проверьте перед продолжением</h2><p>${escape(step.checkpoint)}</p></div></div>` : ''}${progress() === 100 ? `<div class="all-complete"><strong>Все этапы отмечены.</strong>Все ${data.steps.length} этапов отмечены готовыми. Можно вернуться к любой схеме.</div>` : ''}<div class="step-actions"><a class="secondary-button" href="${index ? stepUrl(data.steps[index-1].id) : '#'}"><span aria-hidden="true">←</span>${index ? 'Назад' : 'К началу'}</a><button class="complete-button ${isDone(step.id) ? 'is-complete' : ''}" data-action="toggle-complete" aria-pressed="${isDone(step.id)}"><span class="check-box" aria-hidden="true">${isDone(step.id) ? '✓' : ''}</span>${isDone(step.id) ? 'Шаг выполнен' : 'Отметить выполненным'}</button><button class="primary-button" data-action="next">${index === data.steps.length - 1 ? 'Завершить сборку' : 'Готово, дальше'}<span class="arrow" aria-hidden="true">${index === data.steps.length - 1 ? '✓' : '→'}</span></button></div>${sourceLabel(step) ? `<p class="step-source">Источник: ${sourceLabel(step)}</p>` : ''}</article></div>`;
+    const caption = document.querySelector('.diagram-source');
+    if(step.id==='adjust') document.querySelector('.diagram-card').classList.add('diagram-card--adjust');
+    if (caption) caption.textContent = diagramCaption(step);
+    if (isVectorDiagram(step) && document.querySelector('.diagram-card svg [data-part]')) {
+      const note = document.createElement('p'); note.className = 'vector-note';
+      note.textContent = 'Выбирайте номер на схеме или под ней, чтобы узнать деталь.';
+      document.querySelector('.diagram-card').after(note);
+    }
+    createInspector(document.querySelector('.assembly-layout'));
+    const source = document.querySelector('.step-source');
+    if (source) { const detail = document.createElement('details'); detail.className='source-detail'; detail.innerHTML=`<summary>Источник и оригинальная инструкция</summary><p>${sourceLabel(step)}</p>${data.pdf ? `<p><a href="${escape(data.pdf.url)}" target="_blank" rel="noopener">Открыть полный PDF ↗</a></p>` : ''}`; source.replaceWith(detail); }
+    if (step.sourceNote) { const detail=document.querySelector('.source-detail'); if(detail) { const note=document.createElement('p'); note.textContent=step.sourceNote; detail.append(note); } }
+    document.querySelector('#mobile-steps').addEventListener('change', e => { location.hash = stepUrl(e.target.value); });
+  }
+
+  function partLabel(part) { return String(part.id).startsWith('Ф') ? `Строка ${part.id}` : `№ ${part.id}`; }
+  function partInfoMarkup(part) {
+    return `<div class="selected-part-heading"><span>${escape(partLabel(part))}</span><h3>${escape(part.name)}</h3></div><p class="selected-part-size">${escape(part.size || '')}</p><p class="selected-part-count">В комплекте: ${quantityLabel(part.quantity)}</p>`;
+  }
+  function createInspector(scope) {
+    const old = scope.querySelector('.diagram-inspector'); if(old) old.remove();
+    const ids=[...new Set([...scope.querySelectorAll('svg [data-part]')].map(el=>el.dataset.part))].filter(id=>data.parts.some(part=>String(part.id)===id));
+    if(!ids.length) return;
+    const inspector=document.createElement('div'); inspector.className='diagram-inspector';
+    inspector.innerHTML=`<p class="inspector-label">Нажмите на номер детали</p><div class="diagram-part-buttons">${ids.map(id=>{const part=data.parts.find(p=>String(p.id)===id);return `<button data-select-part="${escape(id)}" aria-pressed="false" aria-label="Показать ${escape(partLabel(part))}: ${escape(part.name)}">${escape(id)}</button>`;}).join('')}</div><div class="diagram-part-info" aria-live="polite"><p class="inspector-placeholder">Здесь появятся название, размер и количество.</p></div>`;
+    if(scope.classList.contains('zoom-dialog')) scope.append(inspector);
+    else (scope.querySelector('.vector-note') || scope.querySelector('.diagram-card')).after(inspector);
+  }
+  function selectDiagramPart(id, scope) {
+    const part=data.parts.find(p=>String(p.id)===String(id)); if(!part || !scope) return;
+    const inspector=scope.querySelector('.diagram-inspector'); if(!inspector) return;
+    const selected=inspector.dataset.selected === String(id) ? '' : String(id);
+    inspector.dataset.selected=selected;
+    scope.querySelectorAll('svg [data-part]').forEach(el=>{const active=el.dataset.part===selected;el.classList.toggle('is-selected',active);if(el.getAttribute('role')==='button')el.setAttribute('aria-pressed',String(active));});
+    scope.querySelectorAll('[data-select-part]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.selectPart===selected)));
+    inspector.querySelector('.diagram-part-info').innerHTML=selected ? partInfoMarkup(part) : '<p class="inspector-placeholder">Здесь появятся название, размер и количество.</p>';
+  }
+  function showPartDialog(id) {
+    const part=data.parts.find(p=>String(p.id)===String(id)); if(!part) return;
+    openDialog(`<div class="part-dialog-art">${partArt(part)}</div>${partInfoMarkup(part)}<p>${escape(part.description || '')}</p><a class="primary-button" href="#parts" data-close>Все детали <span aria-hidden="true">→</span></a>`);
+  }
+
+  function hardwareArt(part) {
+    const name = `${part.name} ${part.id}`.toLowerCase();
+    let drawing;
+    if (/шкант/.test(name)) drawing='<path d="m55 58 57-33 15 9-57 33-15-9Z" fill="#d8dccd"/><path d="m55 58 57-33 15 9-57 33-15-9Zm6-5 15 9m-6-14 15 9m-6-14 15 9m-6-14 15 9m-6-14 15 9m-6-14 15 9"/>';
+    else if (/эксцентрик/.test(name)) drawing='<ellipse cx="90" cy="48" rx="24" ry="17" fill="#d9ddd1"/><path d="M66 48v13c0 10 48 10 48 0V48M66 48c0 23 48 23 48 0s-48-23-48 0Zm14 0h20m-10-9v18"/>';
+    else if (/петл/.test(name)) drawing='<path d="m52 53 27-16 14 8-27 16-14-8Z" fill="#e0e3d7"/><path d="m52 53 27-16 14 8-27 16-14-8Zm30-10 21-12 23 13-21 12-23-13Zm7 10 8 5 14-8M61 53l15-9m27-5 13 7"/>';
+    else if (/гвозд/.test(name)) drawing='<path d="m61 64 57-34m-62 28 11 13m47-49 12 17"/>';
+    else if (/конфирмат|шуруп|винт|саморез/.test(name)) drawing='<path d="m59 63 55-33m-59 25 12 17m-4-15 9 9m-2-14 9 9m-2-14 9 9m-2-14 9 9m-2-14 9 9m-2-14 9 9m0-12 10 6m-5-10 11 19m-8-24 11 19"/>';
+    else if (/ручк/.test(name)) drawing='<path d="m59 59 55-32 9 5-55 32-9-5Zm0 0v10m55-42v10M68 64v10m55-42v10"/>';
+    else if (/угол|опор/.test(name)) drawing='<path d="m65 64 35-21V23l15 9v30L80 82 65 73V43l15 9v30m0-30 35-20"/>';
+    else drawing='<rect x="65" y="28" width="50" height="39" rx="5" fill="#e2e5da"/><path d="M76 39h28M76 48h28M76 57h17"/>';
+    return `<svg viewBox="0 0 180 95" fill="none" stroke="#78876d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${drawing}</svg>`;
+  }
+
+  function partArt(part) {
+    if (part.image) return `<img src="${escape(part.image)}" alt="${escape(part.name)}">`;
+    if (part.kind === 'hardware') return hardwareArt(part);
+    const size = String(part.size || '').match(/[\d,.]+/g)?.map(value => Number(value.replace(',','.'))) || [];
+    const ratio = size.length > 1 ? Math.min(3.5, Math.max(.5, size[0]/size[1])) : 2.1;
+    const w = Math.min(140, 50*ratio), h = Math.min(62, 120/ratio), x = (180-w)/2, y=(95-h)/2;
+    return `<svg viewBox="0 0 180 95" fill="none" aria-hidden="true"><path d="M${x} ${y+12}l${w-18} -12 18 12-${w-18} 12-${18} -12Z" fill="#e5e8dc" stroke="#839077"/><path d="M${x} ${y+12}v${h-18}l18 12V${y+24}l-18-12Z" fill="#ccd3c0" stroke="#839077"/><path d="M${x+18} ${y+24}l${w-18}-12v${h-18}l-${w-18} 12V${y+24}Z" fill="#f0f1e8" stroke="#839077"/></svg>`;
+  }
+
+  function partsPage() {
+    document.title = 'Детали и крепёж — Вилета 6';
+    main.innerHTML = `<section class="parts-page"><a class="back-link" href="#">← К началу</a><div class="eyebrow">Всё начинается с деталей</div><h1>Найдите ту самую.</h1><p class="parts-intro">Сверяйте панели по размерам, а крепёж — по исходной ведомости. Номера здесь соответствуют инструкции: подпишите детали малярным скотчем, чтобы проще находить их при сборке.</p><div class="filter-row"><label class="search-field">${icon('search')}<input type="search" id="parts-search" placeholder="Название, номер или размер" aria-label="Поиск деталей по названию, номеру или размеру"></label><select id="parts-kind" aria-label="Тип деталей"><option value="all">Все детали</option><option value="panel">Панели</option><option value="hardware">Крепёж и фурнитура</option></select></div><p class="parts-count" id="parts-count"></p><div class="parts-grid" id="parts-grid"></div><div class="parts-note">Изображения панелей помогают различить форму. Точные отверстия и ориентацию кромок сверяйте со схемой нужного шага.</div></section>`;
+    const legend = document.createElement('p'); legend.className='parts-legend'; legend.textContent='№ — номера деталей из ведомости комплекта. Ф — строки ведомости фурнитуры. Количества в каталоге указаны для всего комплекта.';
+    document.querySelector('.parts-intro').after(legend);
+    document.querySelector('#parts-search').placeholder='Название, размер или №8';
+    if (state.current) { const step=currentStep(); const back=document.querySelector('.parts-page > .back-link'); back.href=stepUrl(step.id); back.textContent=`← К шагу ${data.steps.indexOf(step)+1} · ${step.title}`; }
+    document.querySelector('#parts-search').addEventListener('input', filterParts);
+    document.querySelector('#parts-kind').addEventListener('change', filterParts);
+    filterParts();
+  }
+
+  function filterParts() {
+    const query = document.querySelector('#parts-search').value.trim().toLowerCase().replace(/,/g,'.');
+    const tokens = query.split(/[×xх*\s]+/).filter(Boolean);
+    const explicitId = query.match(/^[№#]\s*(\d+)$/)?.[1];
+    const exactId = explicitId || (data.parts.some(part=>String(part.id).toLowerCase()===query) ? query : null);
+    const kind = document.querySelector('#parts-kind').value;
+    const found = data.parts.filter(p => (kind === 'all' || p.kind === kind) && (exactId ? String(p.id).toLowerCase() === exactId : tokens.every(token => `${p.id} ${p.name} ${p.size} ${p.description || ''}`.toLowerCase().replace(/,/g,'.').includes(token))));
+    document.querySelector('#parts-count').textContent = `Найдено: ${found.length} из ${data.parts.length}`;
+    document.querySelector('#parts-grid').innerHTML = found.length ? found.map(p => `<article class="part-card ${state.found.includes(String(p.id)) ? 'part-found' : ''}"><div class="part-card-top"><span>${p.id ? `${String(p.id).startsWith('Ф') ? 'Крепёж ' : '№ '}${escape(p.id)}` : 'Фурнитура'}</span><span>${p.quantity ? `В комплекте: ${quantityLabel(p.quantity)}` : ''}</span></div><div class="part-card-art">${partArt(p)}</div><h2>${escape(p.name)}</h2><p>${escape(p.size || p.description || '')}</p>${p.size && p.description ? `<p>${escape(p.description)}</p>` : ''}<button class="found-button ${state.found.includes(String(p.id)) ? 'is-found' : ''}" data-found="${escape(p.id)}" aria-pressed="${state.found.includes(String(p.id))}"><span class="check-box" aria-hidden="true">${state.found.includes(String(p.id)) ? '✓' : ''}</span>${state.found.includes(String(p.id)) ? 'Деталь найдена' : 'Я нашёл деталь'}</button></article>`).join('') : `<div class="empty-state">По этому запросу деталей не нашлось.<button data-action="clear-search">Сбросить поиск</button></div>`;
+  }
+
+  function render() {
+    const hash = location.hash;
+    document.querySelectorAll('[data-nav]').forEach(link => link.classList.toggle('active', hash === '#parts' ? link.dataset.nav === 'parts' : hash.startsWith('#step/') || hash === '#guide' ? link.dataset.nav === 'guide' : false));
+    if (hash === '#parts') partsPage();
+    else if (hash.startsWith('#step/')) {
+      let id; try { id = decodeURIComponent(hash.slice(6)); } catch (_) { id = ''; }
+      const step = data.steps.find(s => String(s.id) === id);
+      if (step) stepPage(step); else home();
+    } else home();
+    if (hash !== '#guide') window.scrollTo(0, 0);
+  }
+
+  function notify(message) {
+    const toast = document.querySelector('#toast');
+    toast.textContent = message; toast.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+  }
+  function openDialog(content) {
+    document.querySelector('#dialog-content').innerHTML = content;
+    const dialog=document.querySelector('#help-dialog'); if(!dialog.open) dialog.showModal();
+  }
+  function closeDialogs() { document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()); }
+  function help(partOnly = false) {
+    if(partOnly) {
+      const step=currentStep();
+      openDialog(`<h2>Детали этого шага.</h2><p>Шаг ${data.steps.indexOf(step)+1} · ${escape(step.title)}</p><div class="context-parts">${(step.items || []).map(itemMarkup).join('')}</div><p>Сначала сравните размеры, затем заводские отверстия и обработанные передние кромки. Совпадение размеров помогает найти кандидатов; ориентацию проверьте на нумерованной схеме этого шага.</p><a class="primary-button" href="#parts" data-close>Все детали и крепёж <span aria-hidden="true">→</span></a>`);
+      return;
+    }
+    openDialog(`<h2>${partOnly ? 'Похожие — не одинаковые.' : 'Собираем спокойно.'}</h2><div class="help-item"><h3>Как различать панели</h3><p>Начните с размера. Затем сравните отверстия и обработанные кромки с оригинальной схемой. Номер из ведомости можно временно написать на малярном скотче.</p></div><div class="help-item"><h3>Как работать со схемой</h3><p>Нажмите «Увеличить» под изображением. В большом окне используйте кнопки + и −, а при увеличении прокручивайте схему.</p></div><div class="help-item"><h3>Как сохраняется прогресс</h3><p>Кнопка «Готово, дальше» завершает текущий этап. Переход через список шагов только открывает нужную схему. Прогресс хранится на этом устройстве в этом браузере.</p></div><a class="primary-button" href="#parts" data-close>Открыть детали <span aria-hidden="true">→</span></a><br><button class="reset-progress" data-action="reset">Сбросить прогресс сборки</button>`);
+  }
+  function sources() {
+    openDialog(`<h2>Основа — ваша инструкция.</h2><p>Руководство подготовлено для шкафа ${escape(data.product.name)} размером ${escape(data.product.dimensions)}. Этапы сопровождают заново нарисованные схемы на основе данных комплекта.</p><div class="source-list">${data.sources.map(s => s.url ? `<a href="${escape(s.url)}" target="_blank" rel="noopener">${escape(s.label)} ↗</a>` : `<span>${escape(s.label)}</span>`).join('')}</div>${data.pdf ? `<a class="primary-button" href="${escape(data.pdf.url)}" download>${escape(data.pdf.label || 'Скачать исходную инструкцию')} ↓</a>` : ''}`);
+    if(data.about){const note=document.createElement('p');note.textContent=data.about;document.querySelector('#dialog-content').append(note);}
+    document.querySelector('#dialog-content > p').textContent=`Руководство подготовлено для шкафа ${data.product.name} размером ${data.product.dimensions}. Наглядные схемы сопровождаются оригинальной инструкцией производителя.`;
+  }
+  function toggleCompleted(step, value) {
+    const id = String(step.id);
+    if (value && !isDone(id)) state.completed.push(id);
+    if (!value) state.completed = state.completed.filter(item => item !== id);
+    save();
+  }
+
+  document.addEventListener('click', event => {
+    const partTarget=event.target.closest('[data-select-part],svg [data-part]');
+    if(partTarget) { selectDiagramPart(partTarget.dataset.selectPart || partTarget.dataset.part,partTarget.closest('.zoom-dialog,.assembly-layout')); return; }
+    const detailTarget=event.target.closest('[data-part-dialog]');
+    if(detailTarget) { showPartDialog(detailTarget.dataset.partDialog); return; }
+    const button = event.target.closest('[data-action], [data-step], [data-close], [data-found]');
+    if (!button) return;
+    if (button.hasAttribute('data-close')) closeDialogs();
+    if (button.dataset.step) location.hash = stepUrl(button.dataset.step);
+    if (button.hasAttribute('data-found')) { const id=button.dataset.found; state.found=state.found.includes(id) ? state.found.filter(item => item !== id) : [...state.found,id]; save(); filterParts(); }
+    const step = currentStep();
+    switch (button.dataset.action) {
+      case 'help': help(); break;
+      case 'part-help': help(true); break;
+      case 'sources': sources(); break;
+      case 'close-dialog': closeDialogs(); break;
+      case 'toggle-complete': if (step) { toggleCompleted(step, !isDone(step.id)); stepPage(step); notify(isDone(step.id) ? 'Шаг отмечен выполненным' : 'Отметка снята'); } break;
+      case 'next': if (step) {
+        toggleCompleted(step, true);
+        const index = data.steps.indexOf(step);
+        if (index < data.steps.length-1) { location.hash = stepUrl(data.steps[index+1].id); }
+        else { stepPage(step); const remaining=data.steps.length-state.completed.length; notify(remaining ? `Этот шаг выполнен. Осталось этапов: ${remaining}` : 'Все шаги выполнены. Прогресс сохранён'); }
+      } break;
+      case 'zoom': if (step) { zoom = 1; document.querySelector('#zoom-content').innerHTML = diagramMarkup(step); document.querySelector('#zoom-title').textContent = step.title; createInspector(document.querySelector('#zoom-dialog')); updateZoom(); document.querySelector('#zoom-dialog').showModal(); } break;
+      case 'zoom-in': zoom = Math.min(3, zoom+.25); updateZoom(); break;
+      case 'zoom-out': zoom = Math.max(.5, zoom-.25); updateZoom(); break;
+      case 'clear-search': document.querySelector('#parts-search').value=''; document.querySelector('#parts-kind').value='all'; filterParts(); document.querySelector('#parts-search').focus(); break;
+      case 'reset':
+        if (confirm('Сбросить все отметки о выполнении? Вы начнёте сборку с первого шага.')) { state = {current:'',completed:[],found:[]}; save(); closeDialogs(); location.hash=''; render(); notify('Прогресс сброшен'); }
+        break;
+    }
+  });
+  document.addEventListener('keydown',event=>{const target=event.target.closest('svg [data-part][role="button"]');if(target && (event.key==='Enter' || event.key===' ')){event.preventDefault();selectDiagramPart(target.dataset.part,target.closest('.zoom-dialog,.assembly-layout'));}});
+  document.querySelector('.skip-link').addEventListener('click',event=>{event.preventDefault();main.focus();main.scrollIntoView();});
+  function updateZoom() {
+    const content = document.querySelector('#zoom-content');
+    content.style.width = `${80 * zoom}%`;
+    content.style.maxWidth = `${900 * zoom}px`;
+    content.querySelectorAll('img,svg').forEach(img => img.style.maxHeight = currentStep()?.id==='adjust' ? 'none' : `${700 * zoom}px`);
+    document.querySelector('#zoom-level').textContent = `${Math.round(zoom*100)}%`;
+  }
+  document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('click', event => { if (event.target === dialog) { const rect=dialog.getBoundingClientRect(); if (event.clientX<rect.left || event.clientX>rect.right || event.clientY<rect.top || event.clientY>rect.bottom) dialog.close(); } }));
+  document.querySelector('#header-download').addEventListener('click', event => { if (!data.pdf) { event.preventDefault(); sources(); } });
+  if (data.pdf) { const link=document.querySelector('#header-download'); link.href=data.pdf.url; link.setAttribute('download',''); }
+  addEventListener('hashchange', render);
+  const mobileBreakpoint=window.matchMedia('(max-width:760px)');
+  mobileBreakpoint.addEventListener('change',()=>{
+    if(location.hash==='#step/adjust') stepPage(currentStep());
+    if(document.querySelector('#zoom-dialog').open && currentStep()?.id==='adjust'){document.querySelector('#zoom-content').innerHTML=diagramMarkup(currentStep());updateZoom();}
+  });
+  render();
+})();

@@ -1,0 +1,18 @@
+{
+  "name": "vileta-6-assembly-guide",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Пошаговое руководство сборки шкафа Вилета 6, 120 × 40 × 210 см",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "serve": "node scripts/serve.cjs",
+    "test": "playwright test -c tests/playwright.config.cjs",
+    "diagrams": "node scripts/render-diagrams.cjs",
+    "diagrams:check": "node scripts/render-diagrams.cjs --check",
+    "heroes": "python scripts/build-heroes.py"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@resvg/resvg-js": "2.6.2"
+  }
+}
