@@ -121,7 +121,7 @@
     b+=segment([174,335],[460,251],'#445845','stroke-width="4"');
     for(let i=0;i<=14;i++){const x=174+i*20.43,y=335-i*6;b+=segment([x,y],[x+4,y+(i%5===0?16:9)],'#445845');}
     b+=`<rect x="105" y="319" width="74" height="61" rx="16" fill="#445845"/><circle cx="141" cy="348" r="18" fill="#DCE7CF"/><text x="141" y="355" text-anchor="middle" fill="#445845" font-size="19">см</text><text x="380" y="425" text-anchor="middle" font-size="23" fill="#445845">Сверьте размеры и расположение отверстий</text>`;
-    return wrapper(b,[45,35,650,440],'Подготовка: разложенные панели и рулетка.','Временный номер — после проверки детали.',false);
+    return wrapper(b,[45,35,650,440],'Подготовка: разложенные панели и рулетка.','Сначала сверьте название на этикетке.',false);
   }
   function renderDiagram(requested){
     const key=aliases[requested]||requested;

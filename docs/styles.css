@@ -55,3 +55,5 @@
 @media(max-width:760px){.identification-dialog{--identification-inline-pad:21px;--identification-block-pad:18px}}
 
 .identification-packaging-note{border-top:1px solid var(--line);padding-top:16px;margin-top:16px;font-size:12px!important;line-height:1.8}
+.part-card .part-card-factory-name{font-size:12px;line-height:1.65;color:var(--olive);margin:0 0 5px}.part-card-factory-name{grid-column:2}
+@media(max-width:760px){.part-card .part-card-factory-name{font-size:12px;margin:0}.part-card:has(svg[data-part-layout=landscape]) .part-card-factory-name{grid-column:1}}

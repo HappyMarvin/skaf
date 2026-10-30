@@ -1,5 +1,14 @@
 const { test, expect } = require('@playwright/test');
 
+test('packing-list names resolve exactly while explicit reference numbers keep their meaning',async({page})=>{
+  await page.goto('./#parts');
+  for(const [query,id]of [['Полка1','9'],['Полка 1','9'],['Стойка2','3'],['Фасад1','4'],['№1','1'],['#1','1'],['ДВП задняя стенка №1','20'],['Ребро жёсткости','15']]){
+    await page.locator('#parts-search').fill(query);
+    await expect(page.locator('.part-card')).toHaveCount(1);
+    await expect(page.locator('.part-card-open')).toHaveAttribute('data-part-dialog',id);
+  }
+});
+
 test('catalogue preview and found mark are separate keyboard actions', async ({ page }) => {
   await page.goto('./#parts');
   await page.locator('#parts-search').fill('№8');
