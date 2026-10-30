@@ -2,7 +2,7 @@
   'use strict';
   // Factory panel dimensions in millimetres; no fixing locations are inferred.
   const parts = [
-    [19,16,2020,307.5,1168,79.5,16,1], [19,16,2020,16,1168,79.5,16,1],
+    [19,16,2020,307.5,1168,79.5,16,3], [19,16,2020,16,1168,79.5,16,1],
     [8,16,2004,0,1168,16,383.5,1], [1,0,0,0,16,2099,383.5,4],
     [18,788,1707.6,0,16,296.4,383.5,3], [14,788,16,0,16,426,383.5,4],
     [15,408,1000,367.5,776,199,16,6], [10,408,1691.6,0,776,16,383.5,4],
@@ -14,7 +14,7 @@
   ];
   const stages={base:1,sides:2,dividers:3,shelves:4,roof:5,'loose-shelves':6,back:7};
   const aliases={preflight:'preparation',prepare:'preparation',frame:'sides',partitions:'dividers',top:'roof','shelves-brace':'loose-shelves',shelves16:'loose-shelves',rear:'back',lift:'raise',adjustment:'adjust'};
-  const titles={base:'Дно и два цоколя',sides:'Правая боковина №2 на основании; левая №1 пока отложена',dividers:'Основная и нижняя стойки; левая боковина пока отложена',shelves:'Результат шага: полки и верхняя стойка; левая боковина установлена последней',roof:'Верхняя панель','loose-shelves':'Оставшиеся полки и ребро жёсткости',back:'Три панели задней стенки',raise:'Подъём с помощником и защита от опрокидывания',rod:'Одна штанга в широкой правой секции',hinges:'Накладные и полунакладные петли',doors:'Шесть дверей шкафа Вилета 6',adjust:'Три направления регулировки положения фасада'};
+  const titles={base:'Дно и передний цоколь; задний отложен до шага 4',sides:'Правая боковина №2 и передний цоколь; задний цоколь и левая №1 пока отложены',dividers:'Основная и нижняя стойки, затем задний цоколь; левая боковина пока отложена',shelves:'Результат шага: полки и верхняя стойка; левая боковина установлена последней',roof:'Верхняя панель','loose-shelves':'Оставшиеся полки и ребро жёсткости',back:'Три панели задней стенки',raise:'Подъём с помощником и защита от опрокидывания',rod:'Одна штанга в широкой правой секции',hinges:'Накладные и полунакладные петли',doors:'Шесть дверей шкафа Вилета 6',adjust:'Три направления регулировки положения фасада'};
   const project=(x,y,z=0)=>[155+.31*x+.24*z,70+.31*y-.16*z];
   const pointList=a=>a.map(p=>p.map(n=>n.toFixed(2)).join(',')).join(' ');
   const shape=(a,fill,stroke,extra='')=>`<polygon points="${pointList(a)}" fill="${fill}" stroke="${stroke}" stroke-width="1.6" stroke-linejoin="round" ${extra}/>`;
@@ -190,13 +190,11 @@
       return wrapper(b,[35,-70,690,920],titles.doors,'Три больших и три малых фасада.',false);
     }
     if(key==='base'){
-      let b=scene([[19,16,2020,307.5,1168,79.5,16,1],[19,16,2020,16,1168,79.5,16,1],[8,16,1700,0,1168,16,383.5,1]],()=>true);
+      let b=scene([[19,16,2020,16,1168,79.5,16,1],[8,16,1700,0,1168,16,383.5,1]],()=>true);
       b+=callout(8,project(730,1700,80),[590,548],'',32);
-      b+=callout(19,project(850,2040,307.5),[655,644],'',32);
       b+=callout(19,project(250,2040,16),[110,728],'',32);
       b+=segment([300,624],[300,670],'#617D50','marker-end="url(#vileta-arrow)" stroke-dasharray="6 5"');
-      b+=segment([470,604],[470,640],'#617D50','marker-end="url(#vileta-arrow)" stroke-dasharray="6 5"');
-      b+='<text x="380" y="507" text-anchor="middle" font-size="25" fill="#445845">Положение цоколей — по заводским отверстиям</text><text x="590" y="695" text-anchor="middle" font-size="25" fill="#445845">Зад</text><text x="250" y="770" text-anchor="middle" font-size="25" fill="#445845">Перед</text>';
+      b+='<text x="380" y="507" text-anchor="middle" font-size="25" fill="#445845">Сейчас — только передний цоколь</text><text x="250" y="770" text-anchor="middle" font-size="25" fill="#445845">Перед</text>';
       return wrapper(b,[45,480,665,410],titles.base);
     }
     if(key==='hinges'){
@@ -234,11 +232,17 @@
     const stage=stages[key];
     if(!stage)return '';
     let body=scene(parts.filter(panel=>panel[7]<=stage),panel=>panel[7]===stage);
+    if(key==='dividers'){
+      // Hidden-line projection of the actual rear plinth; keep the solid geometry in its real position.
+      const rearPlinth=parts.find(panel=>panel[0]===19&&panel[3]>100);
+      const outline=boardFaces(rearPlinth,true).map(face=>'M'+face.points.map(point=>point.join(' ')).join('L')+'Z').join(' ');
+      body+=`<g class="diagram-part hidden-plinth-outline" data-part="19"><path d="${outline}" fill="none" stroke="#607A51" stroke-width="2.4" stroke-dasharray="9 6" stroke-linejoin="round"/></g>`;
+    }
     {
       const labels={
         base:[[8,[730,2004,80],[590,638]],[19,[340,2050,16],[110,732],'×2']],
         sides:[[2,[1192,780,0],[665,270]]],
-        dividers:[[3,[400,980,0],[80,365]],[18,[796,1860,0],[665,655]]],
+        dividers:[[3,[400,980,0],[80,365]],[18,[796,1860,0],[665,655]],[19,[1000,2050,307.5],[665,745]]],
         shelves:[[9,[800,442,0],[665,155]],[10,[1050,1691.6,0],[665,590]],[17,[210,442,0],[80,155],'×2'],[14,[796,230,0],[520,-20]],[1,[8,1000,100],[80,390]]],
         roof:[[7,[620,8,80],[390,-35]]],
         'loose-shelves':[[16,[210,1066.8,0],[80,375],'×3'],[15,[820,1090,383.5],[665,400]]]
@@ -248,7 +252,7 @@
       for(const[a,b]of arrows[key]||[])body+=segment(a,b,'#617D50','marker-end="url(#vileta-arrow)" stroke-dasharray="5 5"');
     }
     if(key==='base')return wrapper(body,[45,580,665,300],titles[key]);
-    const note=key==='loose-shelves'?'Уровни полок и ребра — по сверловке оригинала.':'';
+    const note=key==='dividers'?'Пунктир — задний цоколь под дном.':key==='loose-shelves'?'Уровни полок и ребра — по сверловке оригинала.':'';
     return wrapper(body,[35,-100,690,970],titles[key],note);
   }
   function renderJointDiagram(type){

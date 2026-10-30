@@ -9,6 +9,10 @@ test('bottom hole map preserves the observed groups without assigning other hole
   await expect(drawing.locator('.is-plinth')).toHaveCount(4);
   await expect(drawing.locator('.is-other')).toHaveCount(6);
   expect(await drawing.locator('.is-plinth').evaluateAll(holes=>holes.map(hole=>hole.dataset.holeKey))).toEqual(['H1','H4','H7','H10']);
+  expect(await drawing.locator('[data-hole-step="2"]').evaluateAll(holes=>holes.map(hole=>hole.dataset.holeKey))).toEqual(['H7','H10']);
+  expect(await drawing.locator('[data-hole-step="4"]').evaluateAll(holes=>holes.map(hole=>hole.dataset.holeKey))).toEqual(['H1','H4']);
+  await expect(drawing.locator('.is-later')).toHaveCount(2);
+  await expect(drawing.locator('.is-other[data-hole-step]')).toHaveCount(0);
   expect(await drawing.locator('.base-hole').evaluateAll(holes=>holes.every(hole=>!hole.closest('[data-part]')&&!hole.hasAttribute('tabindex')))).toBeTruthy();
   expect(await drawing.locator('[data-part="8"] > rect').evaluate(rect=>Number(rect.getAttribute('width'))/Number(rect.getAttribute('height')))).toBeCloseTo(1168/383.5,5);
   for(const [side,expected]of [['left',['H1','H2']],['right',['H3','H4','H5']]]){
@@ -16,6 +20,8 @@ test('bottom hole map preserves the observed groups without assigning other hole
     expect(await inset.evaluate(svg=>{const b=svg.viewBox.baseVal;return [...svg.querySelectorAll('.base-hole')].filter(hole=>hole.cx.baseVal.value>=b.x&&hole.cx.baseVal.value<=b.x+b.width&&hole.cy.baseVal.value>=b.y&&hole.cy.baseVal.value<=b.y+b.height).map(hole=>hole.dataset.holeKey);})).toEqual(expected);
   }
   await expect(page.locator('.diagram-card')).toContainText('в этом шаге не используются');
+  await expect(page.locator('.base-top-legend')).toContainText('Передний — 2 сейчас');
+  await expect(page.locator('.base-top-legend')).toContainText('Задний — 2 на шаге 4');
   await expect(page.locator('.base-top-strip-note')).toContainText('под дном');
 });
 

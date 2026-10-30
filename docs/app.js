@@ -91,7 +91,7 @@
   }
 
   function baseTopMarkup(options={}){
-    return `<h3 class="base-top-title">Дно №8 · вид сверху</h3><p class="base-top-orientation">Зад — сверху, перед — снизу</p>${window.renderBaseTopDiagram(options)}<div class="base-top-insets"><h3>Задний ряд крупнее · участки в рамках</h3>${['left','right'].map(side=>`<figure>${window.renderBaseTopInset(side)}<figcaption><strong>${side==='left'?'Слева':'Справа'} на фото</strong><span>Для цоколя — крайнее ${side==='left'?'слева':'справа'}</span></figcaption></figure>`).join('')}</div><div class="base-top-legend"><span><i class="plinth-dot"></i>Для цокольных планок — 4</span><span><i class="other-dot"></i>Другие отверстия — 6: в этом шаге не используются</span></div><p class="base-top-strip-note">Пунктирные полосы показывают планки <strong>под дном</strong>: по 2 конфирмата на каждую. Это не пазы на поверхности.</p><p class="base-top-caption">Расположение приблизительное, по фото детали. Это не шаблон для сверления.</p>`;
+    return `<h3 class="base-top-title">Дно №8 · вид сверху</h3><p class="base-top-orientation">Зад — сверху, перед — снизу</p>${window.renderBaseTopDiagram(options)}<div class="base-top-insets"><h3>Задний ряд крупнее · для шага 4</h3>${['left','right'].map(side=>`<figure>${window.renderBaseTopInset(side)}<figcaption><strong>${side==='left'?'Слева':'Справа'} на фото</strong><span>Для заднего цоколя — крайнее ${side==='left'?'слева':'справа'}</span></figcaption></figure>`).join('')}</div><div class="base-top-legend"><span>Для цоколей — 4 отверстия:</span><span><i class="plinth-dot"></i>Передний — 2 сейчас</span><span><i class="later-dot"></i>Задний — 2 на шаге 4</span><span><i class="other-dot"></i>Другие отверстия — 6: в этом шаге не используются</span></div><p class="base-top-strip-note">Пунктирные полосы показывают планки <strong>под дном</strong>, а не пазы на поверхности. Переднюю закрепите сейчас 2 конфирматами, заднюю — после стойки №3 на шаге 4.</p><p class="base-top-caption">Расположение приблизительное, по фото детали. Это не шаблон для сверления.</p>`;
   }
   function setupBaseViews(column){
     const panel=document.createElement('div');panel.className='diagram-view-panel';panel.id='base-diagram-panel';panel.setAttribute('role','tabpanel');
@@ -117,7 +117,8 @@
 
   function partLabel(part) { return String(part.id).startsWith('Ф') ? `Строка ${part.id}` : `№ ${part.id}`; }
   function partInfoMarkup(part) {
-    return `<div class="selected-part-heading"><span>${escape(partLabel(part))}</span><h3>${escape(part.name)}</h3></div><p class="selected-part-size">${escape(part.size || '')}</p><p class="selected-part-count">В комплекте: ${quantityLabel(part.quantity)}</p>`;
+    const currentPlinth=String(part.id)==='19' && currentStep()?.items?.find(item=>String(item.id)==='19');
+    return `<div class="selected-part-heading"><span>${escape(partLabel(part))}</span><h3>${escape(part.name)}</h3></div><p class="selected-part-size">${escape(part.size || '')}</p><p class="selected-part-count">В комплекте: ${quantityLabel(part.quantity)}</p>${currentPlinth?`<p class="selected-part-step">На этом шаге: ${escape(currentPlinth.name)} — ${quantityLabel(currentPlinth.quantity)}</p>`:''}`;
   }
   function createInspector(scope) {
     const old = scope.querySelector('.diagram-inspector'); if(old) old.remove();

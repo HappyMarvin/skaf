@@ -66,3 +66,5 @@
 @media(max-width:760px){#zoom-content.base-top-content .base-top-orientation{position:sticky;left:0;width:calc(100vw - 44px);max-width:100%;box-sizing:border-box}}
 .diagram-column .diagram-result{margin:0;font-size:14px;line-height:1.65;color:#445845}
 .zoom-result{flex-shrink:0;margin:0;padding:12px 18px;font-size:14px;line-height:1.55;color:#445845;border-bottom:1px solid var(--line)}.zoom-dialog:has(>.zoom-result)[open]{display:flex;flex-direction:column}.zoom-dialog:has(>.zoom-result)>.zoom-header{flex-shrink:0}.zoom-dialog:has(>.zoom-result)>.zoom-viewport{flex:1;min-height:0;height:auto}.zoom-dialog:has(>.zoom-result)>.diagram-inspector{position:static;flex-shrink:0}
+.later-dot{background:var(--paper);border:2px dashed #445845}.selected-part-step{font-size:14px;line-height:1.6;color:var(--olive);margin:8px 0 0}
+.diagram-part.hidden-plinth-outline path{fill:none!important}.diagram-part.hidden-plinth-outline.is-selected path{stroke:#222820;stroke-width:3.4}

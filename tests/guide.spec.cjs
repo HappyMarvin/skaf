@@ -65,6 +65,7 @@ test('diagram inspection supports keyboard selection, repeated selection and enl
 
 test('context part help and finder keep a path back to the same step', async ({ page }) => {
   await page.goto('./#step/base');
+  const title=await page.locator('h1').textContent();
   await page.locator('[data-action="part-help"]').click();
   await expect(page.locator('#help-dialog')).toContainText('Дно');
   await expect(page.locator('#help-dialog')).toContainText('Планки цоколя');
@@ -72,13 +73,14 @@ test('context part help and finder keep a path back to the same step', async ({ 
   await expect(page.locator('.parts-page > .back-link')).toContainText('К шагу 2');
   await page.locator('.parts-page > .back-link').click();
   await expect(page).toHaveURL(/#step\/base$/);
-  await expect(page.locator('h1')).toHaveText('Соберите дно и цоколь');
+  await expect(page.locator('h1')).toHaveText(title);
 });
 
 test('adjustment diagram keeps all three hinge views visible across desktop and phone resize', async ({ page }) => {
   await page.goto('./#step/adjust');
   for(const width of [1440,390,320]) {
     await page.setViewportSize({width,height:900});
+    await expect(page.locator('.diagram-card--adjust > svg')).toHaveAttribute('viewBox',width<760?'0 0 460 1980':'0 0 1380 750');
     await expect(page.locator('.diagram-card--adjust > svg .adjust-panel')).toHaveCount(3);
     const drawing=await page.locator('.diagram-card--adjust > svg').boundingBox();
     for(const panel of await page.locator('.diagram-card--adjust > svg .adjust-panel').all()) {
