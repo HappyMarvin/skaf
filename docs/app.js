@@ -71,6 +71,7 @@
     if(step.id==='adjust') document.querySelector('.diagram-card').classList.add('diagram-card--adjust');
     if(step.id==='prepare') document.querySelector('.step-description').insertAdjacentHTML('afterend',identificationHelpButton());
     if (caption) caption.textContent = diagramCaption(step);
+    if(step.diagramResult){const result=document.createElement('p');result.className='diagram-result';result.textContent=step.diagramResult;document.querySelector('.diagram-card').after(result);}
     if (isVectorDiagram(step) && document.querySelector('.diagram-card svg [data-part]')) {
       const note = document.createElement('p'); note.className = 'vector-note';
       note.textContent = 'Выбирайте номер на схеме или под ней, чтобы узнать деталь.';
@@ -79,7 +80,7 @@
     createInspector(document.querySelector('.assembly-layout'));
     const drawingColumn=document.createElement('div');drawingColumn.className='diagram-column';
     const assembly=document.querySelector('.assembly-layout');
-    const drawingItems=[assembly.querySelector('.diagram-card'),assembly.querySelector('.vector-note'),assembly.querySelector('.diagram-inspector')].filter(Boolean);
+    const drawingItems=[assembly.querySelector('.diagram-card'),assembly.querySelector('.diagram-result'),assembly.querySelector('.vector-note'),assembly.querySelector('.diagram-inspector')].filter(Boolean);
     assembly.prepend(drawingColumn);drawingItems.forEach(item=>drawingColumn.append(item));
     if(step.id==='base') setupBaseViews(drawingColumn);
     if(step.joints?.length){const helpers=document.createElement('div');helpers.className='joint-help';helpers.innerHTML=step.joints.map(type=>`<button data-joint="${escape(type)}">${escape(jointLabels[type])}<span aria-hidden="true">↗</span></button>`).join('');document.querySelector('.part-help-link').after(helpers);}
@@ -294,6 +295,10 @@
   document.addEventListener('keydown',event=>{const target=event.target.closest('svg [data-part][role="button"]');if(target && (event.key==='Enter' || event.key===' ')){event.preventDefault();selectDiagramPart(target.dataset.part,target.closest('.zoom-dialog,.assembly-layout'));}});
   document.querySelector('.skip-link').addEventListener('click',event=>{event.preventDefault();main.focus();main.scrollIntoView();});
   function updateZoom() {
+    const dialog=document.querySelector('#zoom-dialog');
+    const resultText=activeZoomJoint?'':currentStep()?.diagramResult;
+    let result=dialog.querySelector('.zoom-result');
+    if(resultText){if(!result){result=document.createElement('p');result.className='zoom-result';dialog.querySelector('.zoom-header').after(result);}result.textContent=resultText;}else result?.remove();
     const content = document.querySelector('#zoom-content');
     const topPhone=isBaseTopZoom()&&window.matchMedia('(max-width:760px)').matches;
     content.classList.toggle('base-top-content',isBaseTopZoom());

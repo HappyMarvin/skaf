@@ -34,7 +34,9 @@ test('all production steps have usable content and diagrams without JavaScript e
 });
 
 test('visible left portion of the base is not painted over by the side panel',async({page})=>{
-  await page.goto('./#step/sides');
+  await page.goto('./#step/main-shelves');
+  await expect(page.locator('.diagram-card [data-part="1"]').first()).toBeVisible();
+  await page.locator('.diagram-card > svg').scrollIntoViewIfNeeded();
   const hit=await page.locator('.diagram-card > svg').evaluate(svg=>{
     const point=new DOMPoint(190.16,675.24).matrixTransform(svg.getScreenCTM());
     return document.elementFromPoint(point.x,point.y)?.closest('[data-part]')?.dataset.part;
