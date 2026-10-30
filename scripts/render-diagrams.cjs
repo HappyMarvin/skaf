@@ -8,6 +8,7 @@ const check = process.argv.includes('--check');
 if (!check) fs.mkdirSync(previews, { recursive: true });
 const context = { window: {} };
 vm.runInNewContext(fs.readFileSync(root + '/docs/diagrams.js', 'utf8'), context);
+vm.runInNewContext(fs.readFileSync(root + '/docs/base-top.js', 'utf8'), context);
 vm.runInNewContext(fs.readFileSync(root + '/docs/data.js', 'utf8'), context);
 const knownParts = new Set(context.window.GUIDE.parts.map(part => String(part.id)));
 const keys = ['preparation','base','sides','dividers','shelves','roof','loose-shelves','back','raise','rod','hinges','doors','adjust'];
@@ -43,4 +44,11 @@ for (const mobile of [false,true]) {
     if (!check) fs.writeFileSync(previews+'/'+name+'.png',png);
   }
 }
-console.log('13 assembly SVG and 6 joint SVG rendered; no raster references or unknown interactive part IDs.');
+for(const [name,svg]of [['diagram-base-top',context.window.renderBaseTopDiagram()],['diagram-base-top-left',context.window.renderBaseTopInset('left')],['diagram-base-top-right',context.window.renderBaseTopInset('right')]]){
+  if (/<image|\.(?:png|jpe?g|webp)/i.test(svg)) throw new Error('Raster reference in '+name);
+  for(const match of svg.matchAll(/data-part="([^"]+)"/g))if(!knownParts.has(match[1]))throw new Error('Unknown part in '+name);
+  const png=new Resvg(svg,{background:'#F7F6F2'}).render().asPng();
+  if(!check)fs.writeFileSync(root+'/docs/assets/'+name+'.svg',svg);
+  if(!check)fs.writeFileSync(previews+'/'+name+'.png',png);
+}
+console.log('13 assembly SVG, 6 joint SVG and 3 bottom-panel views rendered.');

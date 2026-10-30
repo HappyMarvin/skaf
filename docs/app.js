@@ -12,6 +12,7 @@
   state.current = data.steps.some(step=>String(step.id)===String(state.current)) ? String(state.current) : '';
   let zoom = 1;
   let activeZoomJoint = '';
+  let baseDiagramView = 'assembly';
   const jointLabels={confirmat:'Как соединить конфирматом','cam-dowel':'Как собрать эксцентрик и шкант',glide:'Куда поставить подпятник'};
   let toastTimer;
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -37,7 +38,8 @@
   const number = n => String(n).padStart(2, '0');
   const quantityLabel = value => /^\d+(?:[.,]\d+)?$/.test(String(value)) ? `${escape(value)} шт.` : escape(value);
   const normalizeFactoryName = value => String(value || '').toLowerCase().replace(/ё/g,'е').replace(/[\s№]/g,'');
-  const diagramMarkup = step => {
+  const diagramMarkup = (step, options={}) => {
+    if(step.id==='base' && baseDiagramView==='holes') return baseTopMarkup(options);
     const key = step.diagramKey || step.diagram;
     if (window.renderDiagram && key && !/[./]/.test(key)) { const vector=window.renderDiagram(key); if(vector) return vector; }
     return step.diagram ? `<img src="${escape(step.diagram)}" alt="${escape(step.diagramAlt || `Схема: ${step.title}`)}">` : `<div class="diagram-pending">${icon('guide')}<span>Схема из исходной инструкции</span></div>`;
@@ -79,12 +81,38 @@
     const assembly=document.querySelector('.assembly-layout');
     const drawingItems=[assembly.querySelector('.diagram-card'),assembly.querySelector('.vector-note'),assembly.querySelector('.diagram-inspector')].filter(Boolean);
     assembly.prepend(drawingColumn);drawingItems.forEach(item=>drawingColumn.append(item));
+    if(step.id==='base') setupBaseViews(drawingColumn);
     if(step.joints?.length){const helpers=document.createElement('div');helpers.className='joint-help';helpers.innerHTML=step.joints.map(type=>`<button data-joint="${escape(type)}">${escape(jointLabels[type])}<span aria-hidden="true">↗</span></button>`).join('');document.querySelector('.part-help-link').after(helpers);}
     const source = document.querySelector('.step-source');
     if (source) { const detail = document.createElement('details'); detail.className='source-detail'; detail.innerHTML=`<summary>Источник и оригинальная инструкция</summary><p>${sourceLabel(step)}</p>${data.pdf ? `<p><a href="${escape(data.pdf.url)}" target="_blank" rel="noopener">Открыть полный PDF ↗</a></p>` : ''}`; source.replaceWith(detail); }
     if (step.sourceNote) { const detail=document.querySelector('.source-detail'); if(detail) { const note=document.createElement('p'); note.textContent=step.sourceNote; detail.append(note); } }
     document.querySelector('#mobile-steps').addEventListener('change', e => { location.hash = stepUrl(e.target.value); });
   }
+
+  function baseTopMarkup(options={}){
+    return `<h3 class="base-top-title">Дно №8 · вид сверху</h3><p class="base-top-orientation">Зад — сверху, перед — снизу</p>${window.renderBaseTopDiagram(options)}<div class="base-top-insets"><h3>Задний ряд крупнее · участки в рамках</h3>${['left','right'].map(side=>`<figure>${window.renderBaseTopInset(side)}<figcaption><strong>${side==='left'?'Слева':'Справа'} на фото</strong><span>Для цоколя — крайнее ${side==='left'?'слева':'справа'}</span></figcaption></figure>`).join('')}</div><div class="base-top-legend"><span><i class="plinth-dot"></i>Для цокольных планок — 4</span><span><i class="other-dot"></i>Другие отверстия — 6: в этом шаге не используются</span></div><p class="base-top-strip-note">Пунктирные полосы показывают планки <strong>под дном</strong>: по 2 конфирмата на каждую. Это не пазы на поверхности.</p><p class="base-top-caption">Расположение приблизительное, по фото детали. Это не шаблон для сверления.</p>`;
+  }
+  function setupBaseViews(column){
+    const panel=document.createElement('div');panel.className='diagram-view-panel';panel.id='base-diagram-panel';panel.setAttribute('role','tabpanel');
+    [...column.children].forEach(child=>panel.append(child));column.append(panel);
+    column.insertAdjacentHTML('afterbegin','<div class="diagram-view-tabs" role="tablist" aria-label="Вид схемы дна"><button id="base-tab-assembly" role="tab" data-base-view="assembly" aria-controls="base-diagram-panel">Сборка</button><button id="base-tab-holes" role="tab" data-base-view="holes" aria-controls="base-diagram-panel">Отверстия дна</button></div>');
+    setBaseDiagramView(baseDiagramView);
+  }
+  function setBaseDiagramView(view){
+    if(!['assembly','holes'].includes(view))return;
+    baseDiagramView=view;
+    const scope=document.querySelector('.assembly-layout'),panel=document.querySelector('#base-diagram-panel');if(!panel)return;
+    const previous=scope.querySelector('.diagram-inspector')?.dataset.selected;
+    const card=panel.querySelector('.diagram-card');card.classList.toggle('diagram-card--base-top',view==='holes');
+    card.innerHTML=`${diagramMarkup(currentStep())}<span class="diagram-source" ${view==='holes'?'hidden':''}>Наглядная схема</span><button class="diagram-zoom" data-action="zoom">${icon('expand')} Увеличить</button>`;
+    panel.setAttribute('aria-labelledby',`base-tab-${view}`);
+    document.querySelectorAll('[data-base-view]').forEach(button=>{const selected=button.dataset.baseView===view;button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;});
+    const note=panel.querySelector('.vector-note');if(note)note.textContent=view==='holes'?'Под схемой можно выбрать дно №8 или цокольные планки №19.':'Выбирайте номер на схеме или под ней, чтобы узнать деталь.';
+    createInspector(scope);
+    if(previous && [...scope.querySelectorAll('svg [data-part]')].some(part=>part.dataset.part===previous))selectDiagramPart(previous,scope);
+  }
+  const isBaseTopZoom=()=>!activeZoomJoint && currentStep()?.id==='base' && baseDiagramView==='holes';
+  const zoomMinimum=()=>isBaseTopZoom()&&window.matchMedia('(max-width:760px)').matches?1.5:.5;
 
   function partLabel(part) { return String(part.id).startsWith('Ф') ? `Строка ${part.id}` : `№ ${part.id}`; }
   function partInfoMarkup(part) {
@@ -221,6 +249,7 @@
   }
 
   document.addEventListener('click', event => {
+    const viewTarget=event.target.closest('[data-base-view]');if(viewTarget){setBaseDiagramView(viewTarget.dataset.baseView);return;}
     const jointTarget=event.target.closest('[data-joint]');
     if(jointTarget){activeZoomJoint=jointTarget.dataset.joint;zoom=1;document.querySelector('#zoom-content').innerHTML=window.renderJointDiagram(activeZoomJoint);document.querySelector('#zoom-title').textContent=jointLabels[activeZoomJoint];document.querySelector('#zoom-dialog .diagram-inspector')?.remove();updateZoom();document.querySelector('#zoom-dialog').showModal();return;}
     const partTarget=event.target.closest('[data-select-part],svg [data-part]');
@@ -246,23 +275,35 @@
         if (index < data.steps.length-1) { location.hash = stepUrl(data.steps[index+1].id); }
         else { stepPage(step); const remaining=data.steps.length-state.completed.length; notify(remaining ? `Этот шаг выполнен. Осталось этапов: ${remaining}` : 'Все шаги выполнены. Прогресс сохранён'); }
       } break;
-      case 'zoom': if (step) { activeZoomJoint='';zoom = 1; document.querySelector('#zoom-content').innerHTML = diagramMarkup(step); document.querySelector('#zoom-title').textContent = step.title; createInspector(document.querySelector('#zoom-dialog')); updateZoom(); document.querySelector('#zoom-dialog').showModal(); } break;
+      case 'zoom': if (step) { activeZoomJoint='';zoom = Math.max(1,zoomMinimum()); document.querySelector('#zoom-content').innerHTML = diagramMarkup(step,{interactive:!isBaseTopZoom()}); document.querySelector('#zoom-title').textContent = isBaseTopZoom()?'Дно №8 · вид сверху':step.title; if(isBaseTopZoom())document.querySelector('#zoom-dialog .diagram-inspector')?.remove();else createInspector(document.querySelector('#zoom-dialog')); updateZoom(); document.querySelector('#zoom-dialog').showModal(); } break;
       case 'zoom-in': zoom = Math.min(3, zoom+.25); updateZoom(); break;
-      case 'zoom-out': zoom = Math.max(.5, zoom-.25); updateZoom(); break;
+      case 'zoom-out': zoom = Math.max(zoomMinimum(), zoom-.25); updateZoom(); break;
       case 'clear-search': document.querySelector('#parts-search').value=''; document.querySelector('#parts-kind').value='all'; filterParts(); document.querySelector('#parts-search').focus(); break;
       case 'reset':
         if (confirm('Сбросить все отметки о выполнении? Вы начнёте сборку с первого шага.')) { state = {current:'',completed:[],found:[]}; save(); closeDialogs(); location.hash=''; render(); notify('Прогресс сброшен'); }
         break;
     }
   });
+  document.addEventListener('keydown',event=>{
+    const tab=event.target.closest('[data-base-view]');if(!tab)return;
+    const keys=['ArrowLeft','ArrowRight','Home','End'];if(!keys.includes(event.key))return;event.preventDefault();
+    const views=['assembly','holes'],index=views.indexOf(tab.dataset.baseView);
+    const target=event.key==='Home'?0:event.key==='End'?1:(index+(event.key==='ArrowRight'?1:-1)+2)%2;
+    setBaseDiagramView(views[target]);document.querySelector(`[data-base-view="${views[target]}"]`).focus();
+  });
   document.addEventListener('keydown',event=>{const target=event.target.closest('svg [data-part][role="button"]');if(target && (event.key==='Enter' || event.key===' ')){event.preventDefault();selectDiagramPart(target.dataset.part,target.closest('.zoom-dialog,.assembly-layout'));}});
   document.querySelector('.skip-link').addEventListener('click',event=>{event.preventDefault();main.focus();main.scrollIntoView();});
   function updateZoom() {
     const content = document.querySelector('#zoom-content');
-    content.style.width = `${80 * zoom}%`;
-    content.style.maxWidth = `${900 * zoom}px`;
-    content.querySelectorAll('img,svg').forEach(img => img.style.maxHeight = activeZoomJoint || currentStep()?.id==='adjust' ? 'none' : `${700 * zoom}px`);
+    const topPhone=isBaseTopZoom()&&window.matchMedia('(max-width:760px)').matches;
+    content.classList.toggle('base-top-content',isBaseTopZoom());
+    content.style.width = topPhone?`${400*zoom}px`:`${80 * zoom}%`;
+    content.style.minWidth = topPhone?'600px':'';
+    content.style.maxWidth = topPhone?'none':`${900 * zoom}px`;
+    content.querySelectorAll('img,svg').forEach(img => img.style.maxHeight = activeZoomJoint || isBaseTopZoom() || currentStep()?.id==='adjust' ? 'none' : `${700 * zoom}px`);
     document.querySelector('#zoom-level').textContent = `${Math.round(zoom*100)}%`;
+    document.querySelector('[data-action="zoom-out"]').disabled=zoom<=zoomMinimum();
+    document.querySelector('[data-action="zoom-in"]').disabled=zoom>=3;
   }
   document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('click', event => { if (event.target === dialog) { const rect=dialog.getBoundingClientRect(); if (event.clientX<rect.left || event.clientX>rect.right || event.clientY<rect.top || event.clientY>rect.bottom) dialog.close(); } }));
   document.querySelector('#header-download').addEventListener('click', event => { if (!data.pdf) { event.preventDefault(); sources(); } });
@@ -273,6 +314,7 @@
     if(location.hash==='#step/adjust') stepPage(currentStep());
     if(document.querySelector('#zoom-dialog').open && activeZoomJoint){document.querySelector('#zoom-content').innerHTML=window.renderJointDiagram(activeZoomJoint);updateZoom();}
     else if(document.querySelector('#zoom-dialog').open && currentStep()?.id==='adjust'){document.querySelector('#zoom-content').innerHTML=diagramMarkup(currentStep());updateZoom();}
+    else if(document.querySelector('#zoom-dialog').open && isBaseTopZoom()){zoom=Math.max(zoom,zoomMinimum());updateZoom();}
   });
   render();
 })();
