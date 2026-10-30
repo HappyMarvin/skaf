@@ -11,6 +11,8 @@
   state.found = [...new Set(state.found.map(String))].filter(id => data.parts.some(part => String(part.id) === id));
   state.current = data.steps.some(step=>String(step.id)===String(state.current)) ? String(state.current) : '';
   let zoom = 1;
+  let activeZoomJoint = '';
+  const jointLabels={confirmat:'Как соединить конфирматом','cam-dowel':'Как собрать эксцентрик и шкант',glide:'Куда поставить подпятник'};
   let toastTimer;
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const icon = (name, cls = '') => {
@@ -54,15 +56,14 @@
   function itemMarkup(item) {
     if (typeof item === 'string') return `<div class="part-chip"><span class="part-mini">—</span><span>${escape(item)}</span></div>`;
     const reference = data.parts.find(part => String(part.id) === String(item.id));
-    const hardware = (item.kind || reference?.kind) === 'hardware';
-    return `<button class="part-chip" data-part-dialog="${escape(item.id)}"><span class="part-mini">${hardware ? hardwareArt(reference || item) : escape(item.id || '·')}</span><span>${escape(item.name || reference?.name || '')}${item.quantity ? ` <b class="item-quantity">× ${escape(item.quantity)}</b>` : ''}<small>${escape(item.size || item.description || reference?.size || '')}</small></span></button>`;
+    return `<button class="part-chip" data-part-dialog="${escape(item.id)}"><span class="part-mini">${partArt(reference || item)}</span><span><span class="part-chip-number">${escape(partLabel(reference || item))} · </span>${escape(item.name || reference?.name || '')}${item.quantity ? ` <b class="item-quantity">× ${escape(item.quantity)}</b>` : ''}<small>${escape(item.size || reference?.size || '')}</small>${item.usage ? `<small class="part-chip-usage">${escape(item.usage)}</small>` : ''}</span></button>`;
   }
 
   function stepPage(step) {
     const index = data.steps.indexOf(step);
     state.current = String(step.id); save();
     document.title = `${index + 1}. ${step.title} — Вилета 6`;
-    main.innerHTML = `<div class="guide-shell"><aside class="guide-sidebar"><a class="back-link" href="#">← <span>К началу</span></a><h2 class="sidebar-product">${escape(data.product.name)}</h2><div class="sidebar-dimensions">${escape(data.product.dimensions)}</div><div class="progress-track"><div class="progress-fill" style="width:${progress()}%"></div></div><div class="progress-label"><span>Собираем по порядку</span><span>${state.completed.length} / ${data.steps.length}</span></div><nav class="step-nav" aria-label="Этапы сборки">${data.steps.map((s,i) => `<button data-step="${escape(s.id)}" class="${s === step ? 'current' : ''} ${isDone(s.id) ? 'done' : ''}" ${s === step ? 'aria-current="step"' : ''}><span class="step-nav-number">${isDone(s.id) ? '✓' : number(i+1)}</span><span>${escape(s.title)}</span></button>`).join('')}</nav><div class="sidebar-bottom">Прогресс сохранён в этом браузере.<button data-action="help">Нужна помощь? ↗</button></div></aside><article class="step-main"><div class="mobile-step-nav"><label for="mobile-steps">Все шаги</label><select id="mobile-steps" aria-label="Перейти к шагу">${data.steps.map((s,i) => `<option value="${escape(s.id)}" ${s === step ? 'selected' : ''}>${number(i+1)} · ${escape(s.title)}${isDone(s.id) ? ' ✓' : ''}</option>`).join('')}</select><span class="mobile-step-count">${index+1}/${data.steps.length}</span></div><div class="mobile-progress" style="width:${progress()}%"></div><div class="step-breadcrumb"><span>Инструкция по сборке</span><button data-action="help">${icon('help')} Нужна помощь?</button></div><div class="step-title-row"><div><div class="eyebrow">Шаг ${number(index+1)} из ${number(data.steps.length)}${step.eyebrow ? ` · ${escape(step.eyebrow)}` : ''}</div><h1>${escape(step.title)}</h1><p class="step-description">${escape(step.description || '')}</p></div><span class="step-counter" aria-hidden="true">${number(index+1)}</span></div>${step.warning ? `<div class="safety-note">${icon('help')}<p>${escape(step.warning)}</p></div>` : ''}<div class="assembly-layout"><div class="diagram-card">${diagramMarkup(step)}${sourceLabel(step) ? `<span class="diagram-source">${typeof step.source === 'object' && step.source.page ? `Исходная схема · стр. ${escape(step.source.page)}` : 'Схема из инструкции'}</span>` : ''}<button class="diagram-zoom" data-action="zoom">${icon('expand')} Увеличить</button></div><div class="step-details">${step.items?.length ? `<h2 class="step-aside-title">Понадобится</h2><div class="part-chips">${step.items.map(itemMarkup).join('')}</div><button class="part-help-link" data-action="part-help">Не уверены в детали? <span aria-hidden="true">↗</span></button>` : ''}<ol class="step-instructions">${(step.instructions || []).map(text => `<li>${escape(text)}</li>`).join('')}</ol></div></div>${step.checkpoint ? `<div class="checkpoint">${icon('check')}<div><h2>Проверьте перед продолжением</h2><p>${escape(step.checkpoint)}</p></div></div>` : ''}${progress() === 100 ? `<div class="all-complete"><strong>Все этапы отмечены.</strong>Все ${data.steps.length} этапов отмечены готовыми. Можно вернуться к любой схеме.</div>` : ''}<div class="step-actions"><a class="secondary-button" href="${index ? stepUrl(data.steps[index-1].id) : '#'}"><span aria-hidden="true">←</span>${index ? 'Назад' : 'К началу'}</a><button class="complete-button ${isDone(step.id) ? 'is-complete' : ''}" data-action="toggle-complete" aria-pressed="${isDone(step.id)}"><span class="check-box" aria-hidden="true">${isDone(step.id) ? '✓' : ''}</span>${isDone(step.id) ? 'Шаг выполнен' : 'Отметить выполненным'}</button><button class="primary-button" data-action="next">${index === data.steps.length - 1 ? 'Завершить сборку' : 'Готово, дальше'}<span class="arrow" aria-hidden="true">${index === data.steps.length - 1 ? '✓' : '→'}</span></button></div>${sourceLabel(step) ? `<p class="step-source">Источник: ${sourceLabel(step)}</p>` : ''}</article></div>`;
+    main.innerHTML = `<div class="guide-shell"><aside class="guide-sidebar"><a class="back-link" href="#">← <span>К началу</span></a><h2 class="sidebar-product">${escape(data.product.name)}</h2><div class="sidebar-dimensions">${escape(data.product.dimensions)}</div><div class="progress-track"><div class="progress-fill" style="width:${progress()}%"></div></div><div class="progress-label"><span>Собираем по порядку</span><span>${state.completed.length} / ${data.steps.length}</span></div><nav class="step-nav" aria-label="Этапы сборки">${data.steps.map((s,i) => `<button data-step="${escape(s.id)}" class="${s === step ? 'current' : ''} ${isDone(s.id) ? 'done' : ''}" ${s === step ? 'aria-current="step"' : ''}><span class="step-nav-number">${isDone(s.id) ? '✓' : number(i+1)}</span><span>${escape(s.title)}</span></button>`).join('')}</nav><div class="sidebar-bottom">Прогресс сохранён в этом браузере.<button data-action="help">Нужна помощь? ↗</button></div></aside><article class="step-main"><div class="mobile-step-nav"><label for="mobile-steps">Все шаги</label><select id="mobile-steps" aria-label="Перейти к шагу">${data.steps.map((s,i) => `<option value="${escape(s.id)}" ${s === step ? 'selected' : ''}>${number(i+1)} · ${escape(s.title)}${isDone(s.id) ? ' ✓' : ''}</option>`).join('')}</select><span class="mobile-step-count">${index+1}/${data.steps.length}</span></div><div class="mobile-progress" style="width:${progress()}%"></div><div class="step-breadcrumb"><span>Инструкция по сборке</span><button data-action="help">${icon('help')} Нужна помощь?</button></div><div class="step-title-row"><div><div class="eyebrow">Шаг ${number(index+1)} из ${number(data.steps.length)}${step.eyebrow ? ` · ${escape(step.eyebrow)}` : ''}</div><h1>${escape(step.title)}</h1><p class="step-description">${escape(step.description || '')}</p></div><span class="step-counter" aria-hidden="true">${number(index+1)}</span></div>${step.warning ? `<div class="safety-note">${icon('help')}<p>${escape(step.warning)}</p></div>` : ''}<div class="assembly-layout"><div class="diagram-card">${diagramMarkup(step)}${sourceLabel(step) ? `<span class="diagram-source">${typeof step.source === 'object' && step.source.page ? `Исходная схема · стр. ${escape(step.source.page)}` : 'Схема из инструкции'}</span>` : ''}<button class="diagram-zoom" data-action="zoom">${icon('expand')} Увеличить</button></div><div class="step-details">${step.items?.length ? `<h2 class="step-aside-title">Возьмите</h2><div class="part-chips">${step.items.map(itemMarkup).join('')}</div><button class="part-help-link" data-action="part-help">Не уверены в детали? <span aria-hidden="true">↗</span></button>` : ''}<ol class="step-instructions">${(step.instructions || []).map(text => `<li>${escape(text)}</li>`).join('')}</ol></div></div>${step.checkpoint ? `<div class="checkpoint">${icon('check')}<div><h2>Проверьте перед продолжением</h2><p>${escape(step.checkpoint)}</p></div></div>` : ''}${progress() === 100 ? `<div class="all-complete"><strong>Все этапы отмечены.</strong>Все ${data.steps.length} этапов отмечены готовыми. Можно вернуться к любой схеме.</div>` : ''}<div class="step-actions"><a class="secondary-button" href="${index ? stepUrl(data.steps[index-1].id) : '#'}"><span aria-hidden="true">←</span>${index ? 'Назад' : 'К началу'}</a><button class="complete-button ${isDone(step.id) ? 'is-complete' : ''}" data-action="toggle-complete" aria-pressed="${isDone(step.id)}"><span class="check-box" aria-hidden="true">${isDone(step.id) ? '✓' : ''}</span>${isDone(step.id) ? 'Шаг выполнен' : 'Отметить выполненным'}</button><button class="primary-button" data-action="next">${index === data.steps.length - 1 ? 'Завершить сборку' : 'Готово, дальше'}<span class="arrow" aria-hidden="true">${index === data.steps.length - 1 ? '✓' : '→'}</span></button></div>${sourceLabel(step) ? `<p class="step-source">Источник: ${sourceLabel(step)}</p>` : ''}</article></div>`;
     const caption = document.querySelector('.diagram-source');
     if(step.id==='adjust') document.querySelector('.diagram-card').classList.add('diagram-card--adjust');
     if (caption) caption.textContent = diagramCaption(step);
@@ -72,6 +73,11 @@
       document.querySelector('.diagram-card').after(note);
     }
     createInspector(document.querySelector('.assembly-layout'));
+    const drawingColumn=document.createElement('div');drawingColumn.className='diagram-column';
+    const assembly=document.querySelector('.assembly-layout');
+    const drawingItems=[assembly.querySelector('.diagram-card'),assembly.querySelector('.vector-note'),assembly.querySelector('.diagram-inspector')].filter(Boolean);
+    assembly.prepend(drawingColumn);drawingItems.forEach(item=>drawingColumn.append(item));
+    if(step.joints?.length){const helpers=document.createElement('div');helpers.className='joint-help';helpers.innerHTML=step.joints.map(type=>`<button data-joint="${escape(type)}">${escape(jointLabels[type])}<span aria-hidden="true">↗</span></button>`).join('');document.querySelector('.part-help-link').after(helpers);}
     const source = document.querySelector('.step-source');
     if (source) { const detail = document.createElement('details'); detail.className='source-detail'; detail.innerHTML=`<summary>Источник и оригинальная инструкция</summary><p>${sourceLabel(step)}</p>${data.pdf ? `<p><a href="${escape(data.pdf.url)}" target="_blank" rel="noopener">Открыть полный PDF ↗</a></p>` : ''}`; source.replaceWith(detail); }
     if (step.sourceNote) { const detail=document.querySelector('.source-detail'); if(detail) { const note=document.createElement('p'); note.textContent=step.sourceNote; detail.append(note); } }
@@ -102,30 +108,13 @@
   }
   function showPartDialog(id) {
     const part=data.parts.find(p=>String(p.id)===String(id)); if(!part) return;
-    openDialog(`<div class="part-dialog-art">${partArt(part)}</div>${partInfoMarkup(part)}<p>${escape(part.description || '')}</p><a class="primary-button" href="#parts" data-close>Все детали <span aria-hidden="true">→</span></a>`);
+    openDialog(`<div class="part-detail-layout"><figure class="part-dialog-art">${partArt(part,'detail')}</figure><div class="part-detail-copy"><span class="eyebrow">${escape(partLabel(part))}</span><h2 id="part-dialog-title">${escape(part.name)}</h2><dl class="part-measurements"><div><dt>Размеры / обозначение</dt><dd>${escape(part.size || 'Не указаны в ведомости')}</dd></div><div><dt>В комплекте</dt><dd>${quantityLabel(part.quantity)}</dd></div></dl><p class="part-detail-description">${escape(part.description || '')}</p><div class="part-dialog-actions"><button class="secondary-button" data-action="close-dialog">Закрыть просмотр</button>${location.hash==='#parts' ? '' : '<a class="small-link" href="#parts" data-close>Все детали <span aria-hidden="true">→</span></a>'}</div></div></div>`,{part:true});
+    const extra=[['Как узнать',part.recognize],['Для чего',part.purpose]].filter(([,text])=>text);
+    if(extra.length) document.querySelector('.part-detail-description').insertAdjacentHTML('beforebegin',extra.map(([title,text])=>`<section class="part-detail-note"><h3>${escape(title)}</h3><p>${escape(text)}</p></section>`).join(''));
   }
 
-  function hardwareArt(part) {
-    const name = `${part.name} ${part.id}`.toLowerCase();
-    let drawing;
-    if (/шкант/.test(name)) drawing='<path d="m55 58 57-33 15 9-57 33-15-9Z" fill="#d8dccd"/><path d="m55 58 57-33 15 9-57 33-15-9Zm6-5 15 9m-6-14 15 9m-6-14 15 9m-6-14 15 9m-6-14 15 9m-6-14 15 9"/>';
-    else if (/эксцентрик/.test(name)) drawing='<ellipse cx="90" cy="48" rx="24" ry="17" fill="#d9ddd1"/><path d="M66 48v13c0 10 48 10 48 0V48M66 48c0 23 48 23 48 0s-48-23-48 0Zm14 0h20m-10-9v18"/>';
-    else if (/петл/.test(name)) drawing='<path d="m52 53 27-16 14 8-27 16-14-8Z" fill="#e0e3d7"/><path d="m52 53 27-16 14 8-27 16-14-8Zm30-10 21-12 23 13-21 12-23-13Zm7 10 8 5 14-8M61 53l15-9m27-5 13 7"/>';
-    else if (/гвозд/.test(name)) drawing='<path d="m61 64 57-34m-62 28 11 13m47-49 12 17"/>';
-    else if (/конфирмат|шуруп|винт|саморез/.test(name)) drawing='<path d="m59 63 55-33m-59 25 12 17m-4-15 9 9m-2-14 9 9m-2-14 9 9m-2-14 9 9m-2-14 9 9m-2-14 9 9m0-12 10 6m-5-10 11 19m-8-24 11 19"/>';
-    else if (/ручк/.test(name)) drawing='<path d="m59 59 55-32 9 5-55 32-9-5Zm0 0v10m55-42v10M68 64v10m55-42v10"/>';
-    else if (/угол|опор/.test(name)) drawing='<path d="m65 64 35-21V23l15 9v30L80 82 65 73V43l15 9v30m0-30 35-20"/>';
-    else drawing='<rect x="65" y="28" width="50" height="39" rx="5" fill="#e2e5da"/><path d="M76 39h28M76 48h28M76 57h17"/>';
-    return `<svg viewBox="0 0 180 95" fill="none" stroke="#78876d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${drawing}</svg>`;
-  }
-
-  function partArt(part) {
-    if (part.image) return `<img src="${escape(part.image)}" alt="${escape(part.name)}">`;
-    if (part.kind === 'hardware') return hardwareArt(part);
-    const size = String(part.size || '').match(/[\d,.]+/g)?.map(value => Number(value.replace(',','.'))) || [];
-    const ratio = size.length > 1 ? Math.min(3.5, Math.max(.5, size[0]/size[1])) : 2.1;
-    const w = Math.min(140, 50*ratio), h = Math.min(62, 120/ratio), x = (180-w)/2, y=(95-h)/2;
-    return `<svg viewBox="0 0 180 95" fill="none" aria-hidden="true"><path d="M${x} ${y+12}l${w-18} -12 18 12-${w-18} 12-${18} -12Z" fill="#e5e8dc" stroke="#839077"/><path d="M${x} ${y+12}v${h-18}l18 12V${y+24}l-18-12Z" fill="#ccd3c0" stroke="#839077"/><path d="M${x+18} ${y+24}l${w-18}-12v${h-18}l-${w-18} 12V${y+24}Z" fill="#f0f1e8" stroke="#839077"/></svg>`;
+  function partArt(part, mode = 'compact') {
+    return window.renderPartArt(part, { mode });
   }
 
   function partsPage() {
@@ -140,6 +129,19 @@
     filterParts();
   }
 
+  function partCardMarkup(part) {
+    const found=state.found.includes(String(part.id));
+    const label=String(part.id).startsWith('Ф') ? `Крепёж ${part.id}` : `№ ${part.id}`;
+    return `<article class="part-card ${found ? 'part-found' : ''}">
+      <div class="part-card-top"><span>${escape(label)}</span><span>В комплекте: ${quantityLabel(part.quantity)}</span></div>
+      <div class="part-card-art">${partArt(part)}</div>
+      <h2><button class="part-card-open" data-part-dialog="${escape(part.id)}" aria-label="Открыть деталь ${escape(label)}: ${escape(part.name)}">${escape(part.name)}<span aria-hidden="true">↗</span></button></h2>
+      <p class="part-card-size">${escape(part.size || part.description || '')}</p>
+      ${part.size && part.description ? `<p class="part-card-description">${escape(part.description)}</p>` : ''}
+      <button class="found-button ${found ? 'is-found' : ''}" data-found="${escape(part.id)}" aria-pressed="${found}"><span class="check-box" aria-hidden="true">${found ? '✓' : ''}</span>${found ? 'Деталь найдена' : 'Я нашёл деталь'}</button>
+    </article>`;
+  }
+
   function filterParts() {
     const query = document.querySelector('#parts-search').value.trim().toLowerCase().replace(/,/g,'.');
     const tokens = query.split(/[×xх*\s]+/).filter(Boolean);
@@ -148,7 +150,7 @@
     const kind = document.querySelector('#parts-kind').value;
     const found = data.parts.filter(p => (kind === 'all' || p.kind === kind) && (exactId ? String(p.id).toLowerCase() === exactId : tokens.every(token => `${p.id} ${p.name} ${p.size} ${p.description || ''}`.toLowerCase().replace(/,/g,'.').includes(token))));
     document.querySelector('#parts-count').textContent = `Найдено: ${found.length} из ${data.parts.length}`;
-    document.querySelector('#parts-grid').innerHTML = found.length ? found.map(p => `<article class="part-card ${state.found.includes(String(p.id)) ? 'part-found' : ''}"><div class="part-card-top"><span>${p.id ? `${String(p.id).startsWith('Ф') ? 'Крепёж ' : '№ '}${escape(p.id)}` : 'Фурнитура'}</span><span>${p.quantity ? `В комплекте: ${quantityLabel(p.quantity)}` : ''}</span></div><div class="part-card-art">${partArt(p)}</div><h2>${escape(p.name)}</h2><p>${escape(p.size || p.description || '')}</p>${p.size && p.description ? `<p>${escape(p.description)}</p>` : ''}<button class="found-button ${state.found.includes(String(p.id)) ? 'is-found' : ''}" data-found="${escape(p.id)}" aria-pressed="${state.found.includes(String(p.id))}"><span class="check-box" aria-hidden="true">${state.found.includes(String(p.id)) ? '✓' : ''}</span>${state.found.includes(String(p.id)) ? 'Деталь найдена' : 'Я нашёл деталь'}</button></article>`).join('') : `<div class="empty-state">По этому запросу деталей не нашлось.<button data-action="clear-search">Сбросить поиск</button></div>`;
+    document.querySelector('#parts-grid').innerHTML = found.length ? found.map(partCardMarkup).join('') : `<div class="empty-state">По этому запросу деталей не нашлось.<button data-action="clear-search">Сбросить поиск</button></div>`;
   }
 
   function render() {
@@ -168,9 +170,14 @@
     toast.textContent = message; toast.classList.add('show');
     clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
   }
-  function openDialog(content) {
+  function openDialog(content, options = {}) {
     document.querySelector('#dialog-content').innerHTML = content;
-    const dialog=document.querySelector('#help-dialog'); if(!dialog.open) dialog.showModal();
+    const dialog=document.querySelector('#help-dialog');
+    dialog.classList.toggle('part-dialog',Boolean(options.part));
+    dialog.setAttribute('aria-label',options.part ? 'Просмотр детали' : 'Под рукой');
+    if(options.part) dialog.setAttribute('aria-labelledby','part-dialog-title'); else dialog.removeAttribute('aria-labelledby');
+    if(!dialog.open) dialog.showModal();
+    dialog.scrollTop=0;
   }
   function closeDialogs() { document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close()); }
   function help(partOnly = false) {
@@ -194,6 +201,8 @@
   }
 
   document.addEventListener('click', event => {
+    const jointTarget=event.target.closest('[data-joint]');
+    if(jointTarget){activeZoomJoint=jointTarget.dataset.joint;zoom=1;document.querySelector('#zoom-content').innerHTML=window.renderJointDiagram(activeZoomJoint);document.querySelector('#zoom-title').textContent=jointLabels[activeZoomJoint];document.querySelector('#zoom-dialog .diagram-inspector')?.remove();updateZoom();document.querySelector('#zoom-dialog').showModal();return;}
     const partTarget=event.target.closest('[data-select-part],svg [data-part]');
     if(partTarget) { selectDiagramPart(partTarget.dataset.selectPart || partTarget.dataset.part,partTarget.closest('.zoom-dialog,.assembly-layout')); return; }
     const detailTarget=event.target.closest('[data-part-dialog]');
@@ -202,7 +211,7 @@
     if (!button) return;
     if (button.hasAttribute('data-close')) closeDialogs();
     if (button.dataset.step) location.hash = stepUrl(button.dataset.step);
-    if (button.hasAttribute('data-found')) { const id=button.dataset.found; state.found=state.found.includes(id) ? state.found.filter(item => item !== id) : [...state.found,id]; save(); filterParts(); }
+    if (button.hasAttribute('data-found')) { const id=button.dataset.found; state.found=state.found.includes(id) ? state.found.filter(item => item !== id) : [...state.found,id]; save(); filterParts(); document.querySelector(`[data-found="${CSS.escape(id)}"]`)?.focus(); }
     const step = currentStep();
     switch (button.dataset.action) {
       case 'help': help(); break;
@@ -216,7 +225,7 @@
         if (index < data.steps.length-1) { location.hash = stepUrl(data.steps[index+1].id); }
         else { stepPage(step); const remaining=data.steps.length-state.completed.length; notify(remaining ? `Этот шаг выполнен. Осталось этапов: ${remaining}` : 'Все шаги выполнены. Прогресс сохранён'); }
       } break;
-      case 'zoom': if (step) { zoom = 1; document.querySelector('#zoom-content').innerHTML = diagramMarkup(step); document.querySelector('#zoom-title').textContent = step.title; createInspector(document.querySelector('#zoom-dialog')); updateZoom(); document.querySelector('#zoom-dialog').showModal(); } break;
+      case 'zoom': if (step) { activeZoomJoint='';zoom = 1; document.querySelector('#zoom-content').innerHTML = diagramMarkup(step); document.querySelector('#zoom-title').textContent = step.title; createInspector(document.querySelector('#zoom-dialog')); updateZoom(); document.querySelector('#zoom-dialog').showModal(); } break;
       case 'zoom-in': zoom = Math.min(3, zoom+.25); updateZoom(); break;
       case 'zoom-out': zoom = Math.max(.5, zoom-.25); updateZoom(); break;
       case 'clear-search': document.querySelector('#parts-search').value=''; document.querySelector('#parts-kind').value='all'; filterParts(); document.querySelector('#parts-search').focus(); break;
@@ -231,7 +240,7 @@
     const content = document.querySelector('#zoom-content');
     content.style.width = `${80 * zoom}%`;
     content.style.maxWidth = `${900 * zoom}px`;
-    content.querySelectorAll('img,svg').forEach(img => img.style.maxHeight = currentStep()?.id==='adjust' ? 'none' : `${700 * zoom}px`);
+    content.querySelectorAll('img,svg').forEach(img => img.style.maxHeight = activeZoomJoint || currentStep()?.id==='adjust' ? 'none' : `${700 * zoom}px`);
     document.querySelector('#zoom-level').textContent = `${Math.round(zoom*100)}%`;
   }
   document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('click', event => { if (event.target === dialog) { const rect=dialog.getBoundingClientRect(); if (event.clientX<rect.left || event.clientX>rect.right || event.clientY<rect.top || event.clientY>rect.bottom) dialog.close(); } }));
@@ -241,7 +250,8 @@
   const mobileBreakpoint=window.matchMedia('(max-width:760px)');
   mobileBreakpoint.addEventListener('change',()=>{
     if(location.hash==='#step/adjust') stepPage(currentStep());
-    if(document.querySelector('#zoom-dialog').open && currentStep()?.id==='adjust'){document.querySelector('#zoom-content').innerHTML=diagramMarkup(currentStep());updateZoom();}
+    if(document.querySelector('#zoom-dialog').open && activeZoomJoint){document.querySelector('#zoom-content').innerHTML=window.renderJointDiagram(activeZoomJoint);updateZoom();}
+    else if(document.querySelector('#zoom-dialog').open && currentStep()?.id==='adjust'){document.querySelector('#zoom-content').innerHTML=diagramMarkup(currentStep());updateZoom();}
   });
   render();
 })();

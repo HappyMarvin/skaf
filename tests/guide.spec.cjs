@@ -20,6 +20,7 @@ test('all production steps have usable content and diagrams without JavaScript e
     await expect(page.locator('h1')).toHaveText(step.title);
     await expect(page.locator('.diagram-card')).toBeVisible();
     await expect(page.locator('.diagram-card > svg')).toHaveCount(1);
+    await expect(page.locator('.diagram-card [data-unresolved-order]:not([data-unresolved-order="0"])')).toHaveCount(0);
     await expect(page.locator('.diagram-card > img')).toHaveCount(0);
     await expect(page.locator('[data-action="original-diagram"]')).toHaveCount(0);
     if(['prepare','adjust'].includes(step.id)) await expect(page.locator('.diagram-inspector')).toHaveCount(0);
@@ -30,6 +31,15 @@ test('all production steps have usable content and diagrams without JavaScript e
   }
   expect(errors).toEqual([]);
   expect(sourcePhotos).toEqual([]);
+});
+
+test('visible left portion of the base is not painted over by the side panel',async({page})=>{
+  await page.goto('./#step/sides');
+  const hit=await page.locator('.diagram-card > svg').evaluate(svg=>{
+    const point=new DOMPoint(190.16,675.24).matrixTransform(svg.getScreenCTM());
+    return document.elementFromPoint(point.x,point.y)?.closest('[data-part]')?.dataset.part;
+  });
+  expect(hit).toBe('8');
 });
 
 test('diagram inspection supports keyboard selection, repeated selection and enlarged view', async ({ page }) => {
@@ -195,6 +205,10 @@ test('portable file opens offline with diagrams, local font and saved progress',
   await page.getByRole('button',{name:'Готово, дальше',exact:true}).click();
   await page.reload();
   expect((await stored(page)).completed).toEqual(['prepare']);
+  await page.goto(`${file}#parts`);
+  await page.locator('#parts-search').fill('Ф5');
+  await page.locator('.part-card-open').click();
+  expect(await page.evaluate(()=>new Promise(resolve=>{const image=new Image();image.onload=()=>resolve(true);image.onerror=()=>resolve(false);image.src=document.querySelector('.part-dialog-art image').getAttribute('href');}))).toBeTruthy();
   expect(remote).toEqual([]);
   expect(errors).toEqual([]);
 });

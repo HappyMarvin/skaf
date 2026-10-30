@@ -12,6 +12,9 @@ test('design screenshots', async ({ page }) => {
   if (!steps.length) return;
   await page.goto(`./#step/${steps[1].id}`);
   await page.screenshot({ path: path.join(folder, 'step-02-desktop.png'), fullPage: true });
+  await page.screenshot({path:path.join(folder,'base-desktop.png')});
+  await page.goto('./#step/sides');
+  await page.screenshot({path:path.join(folder,'sides-desktop.png')});
   await page.goto('./#step/main-shelves');
   await page.locator('.assembly-layout [data-select-part="9"]').click();
   await page.evaluate(()=>window.scrollTo(0,100));
@@ -19,6 +22,30 @@ test('design screenshots', async ({ page }) => {
   await page.goto(`./#step/${steps[1].id}`);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: path.join(folder, 'step-02-mobile.png'), fullPage: true });
+  await page.goto('./#step/main-shelves');
+  await page.locator('.diagram-column').scrollIntoViewIfNeeded();
+  await page.screenshot({path:path.join(folder,'main-shelves-mobile.png')});
   await page.goto('./#parts');
   await page.screenshot({ path: path.join(folder, 'finder-mobile.png'), fullPage: true });
+});
+
+test('component design screenshots', async ({ page }) => {
+  await page.goto('./#parts');
+  await page.screenshot({path:path.join(folder,'parts-catalogue-desktop.png')});
+  await page.locator('#parts-search').fill('№8');
+  await page.locator('.part-card-open').click();
+  await page.screenshot({path:path.join(folder,'part-bottom-desktop.png')});
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('.part-card-open').click();
+  await page.screenshot({path:path.join(folder,'part-bottom-mobile.png')});
+  await page.keyboard.press('Escape');
+  await page.locator('#parts-search').fill('Ф5');
+  await page.locator('.part-card-open').click();
+  await page.screenshot({path:path.join(folder,'part-hinge-mobile.png')});
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({width:320,height:844});
+  await page.locator('#parts-search').fill('№1');
+  await page.locator('.part-card-open').click();
+  await page.screenshot({path:path.join(folder,'part-side-mobile.png')});
 });

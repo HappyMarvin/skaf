@@ -18,6 +18,7 @@ for (let i=0; i<keys.length; i++) {
   const unknown = ids.filter(id => !knownParts.has(id));
   if (unknown.length) throw new Error('Unknown part IDs in ' + keys[i] + ': ' + unknown.join(', '));
   if (/<image|\.(?:png|jpe?g|webp)/i.test(svg)) throw new Error('Raster reference in ' + keys[i]);
+  for(const match of svg.matchAll(/data-unresolved-order="(\d+)"/g))if(Number(match[1])!==0)throw new Error('Unresolved face order in '+keys[i]);
   if (!check) fs.writeFileSync(root + '/docs/assets/diagram-' + keys[i] + '.svg',svg);
   const png = new Resvg(svg, { background:'#F7F6F2' }).render().asPng();
   if (!check) fs.writeFileSync(previews + '/diagram-' + keys[i] + '-preview.png',png);
@@ -31,4 +32,15 @@ context.window.matchMedia=()=>({matches:true});
 const mobileAdjust=context.window.renderDiagram('adjust');
 if (!check) fs.writeFileSync(root+'/docs/assets/diagram-adjust-mobile.svg',mobileAdjust);
 if (!check) fs.writeFileSync(previews+'/diagram-adjust-mobile-preview.png',new Resvg(mobileAdjust,{background:'#F7F6F2'}).render().asPng());
-console.log('13 SVG diagrams rendered; no raster references or unknown interactive part IDs.');
+for (const mobile of [false,true]) {
+  context.window.matchMedia=()=>({matches:mobile});
+  for (const type of ['confirmat','cam-dowel','glide']) {
+    const joint=context.window.renderJointDiagram(type);
+    if (!joint || /<image|\.(?:png|jpe?g|webp)/i.test(joint)) throw new Error('Invalid joint illustration: '+type);
+    const name='joint-'+type+(mobile?'-mobile':'');
+    const png=new Resvg(joint,{background:'#F7F6F2'}).render().asPng();
+    if (!check) fs.writeFileSync(root+'/docs/assets/'+name+'.svg',joint);
+    if (!check) fs.writeFileSync(previews+'/'+name+'.png',png);
+  }
+}
+console.log('13 assembly SVG and 6 joint SVG rendered; no raster references or unknown interactive part IDs.');

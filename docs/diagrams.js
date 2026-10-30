@@ -18,13 +18,85 @@
   const project=(x,y,z=0)=>[155+.31*x+.24*z,70+.31*y-.16*z];
   const pointList=a=>a.map(p=>p.map(n=>n.toFixed(2)).join(',')).join(' ');
   const shape=(a,fill,stroke,extra='')=>`<polygon points="${pointList(a)}" fill="${fill}" stroke="${stroke}" stroke-width="1.6" stroke-linejoin="round" ${extra}/>`;
-  const segment=(a,b,stroke='#8B9485',extra='')=>`<path d="M${a.join(' ')} L${b.join(' ')}" fill="none" stroke="${stroke}" ${extra.includes('stroke-width')?'':'stroke-width="1.8"'} ${extra}/>`;
-  function board(b,active){
+  const segment=(a,b,stroke='#8B9485',extra='')=>{
+    const endArrow=/marker-end=/.test(extra);
+    const attributes=extra.replace(/marker-end="[^"]*"/g,'');
+    const width=Number(extra.match(/stroke-width="([\d.]+)"/)?.[1]||1.8);
+    let markup=`<path d="M${a.join(' ')} L${b.join(' ')}" fill="none" stroke="${stroke}" ${extra.includes('stroke-width')?'':'stroke-width="1.8"'} ${attributes}/>`;
+    if(endArrow){
+      const length=Math.hypot(b[0]-a[0],b[1]-a[1]);
+      if(length){
+        const ux=(b[0]-a[0])/length,uy=(b[1]-a[1])/length,size=Math.max(9,width*3.5);
+        const wing=sign=>[b[0]-ux*size+uy*size*.5*sign,b[1]-uy*size-ux*size*.5*sign];
+        markup+=`<path d="M${wing(1).join(' ')}L${b.join(' ')}L${wing(-1).join(' ')}" fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`;
+      }
+    }
+    return markup;
+  };
+  function boardFaces(b,active){
     const [id,x,y,z,w,h,d]=b;
     const c=active?['#D9E6CD','#9DAF8D','#B8CBA6','#455E3A']:['#F7F8F3','#E9ECE3','#F0F2EB','#A5AD9D'];
-    return `<g class="diagram-part${active?' is-current':''}" data-part="${id}">`+shape([project(x,y,z),project(x+w,y,z),project(x+w,y,z+d),project(x,y,z+d)],c[0],c[3])+
-      shape([project(x+w,y,z),project(x+w,y,z+d),project(x+w,y+h,z+d),project(x+w,y+h,z)],c[1],c[3])+
-      shape([project(x,y,z),project(x+w,y,z),project(x+w,y+h,z),project(x,y+h,z)],c[2],c[3])+'</g>';
+    return [
+      {axis:1,limit:y,vertices:[[x,y,z],[x+w,y,z],[x+w,y,z+d],[x,y,z+d]],fill:c[0]},
+      {axis:0,limit:x+w,vertices:[[x+w,y,z],[x+w,y,z+d],[x+w,y+h,z+d],[x+w,y+h,z]],fill:c[1]},
+      {axis:2,limit:z,vertices:[[x,y,z],[x+w,y,z],[x+w,y+h,z],[x,y+h,z]],fill:c[2]}
+    ].map(face=>({...face,id,active,stroke:c[3],points:face.vertices.map(vertex=>project(...vertex))}));
+  }
+  const cross=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+  const signedArea=polygon=>polygon.reduce((sum,point,index)=>{
+    const next=polygon[(index+1)%polygon.length];return sum+point[0]*next[1]-next[0]*point[1];
+  },0)/2;
+  function projectedOverlap(subject,clip){
+    let result=subject;
+    const sign=Math.sign(signedArea(clip));
+    for(let i=0;i<clip.length&&result.length;i++){
+      const a=clip[i],b=clip[(i+1)%clip.length],input=result;
+      result=[];
+      let previous=input[input.length-1],previousDistance=sign*cross(a,b,previous);
+      for(const current of input){
+        const distance=sign*cross(a,b,current);
+        if((distance>=-1e-7)!==(previousDistance>=-1e-7)){
+          const ratio=previousDistance/(previousDistance-distance);
+          result.push([previous[0]+(current[0]-previous[0])*ratio,previous[1]+(current[1]-previous[1])*ratio]);
+        }
+        if(distance>=-1e-7)result.push(current);
+        previous=current;previousDistance=distance;
+      }
+    }
+    return result;
+  }
+  function faceDepth(face,point){
+    // A viewing ray is (x0-.24/.31*t, y0+.16/.31*t, t).
+    // Smaller t is closer to the camera. Compare only overlapping polygons:
+    // sorting a whole tall panel by its centroid incorrectly hides the floor.
+    const x0=(point[0]-155)/.31,y0=(point[1]-70)/.31;
+    if(face.axis===0)return(face.limit-x0)/(-.24/.31);
+    if(face.axis===1)return(face.limit-y0)/(.16/.31);
+    return face.limit;
+  }
+  function scene(boards,isActive=()=>false){
+    const faces=boards.flatMap(board=>boardFaces(board,isActive(board)));
+    const following=faces.map(()=>new Set()),incoming=faces.map(()=>0);
+    for(let i=0;i<faces.length;i++)for(let j=i+1;j<faces.length;j++){
+      const overlap=projectedOverlap(faces[i].points,faces[j].points);
+      if(overlap.length<3||Math.abs(signedArea(overlap))<.01)continue;
+      const point=overlap.reduce((sum,current)=>[sum[0]+current[0]/overlap.length,sum[1]+current[1]/overlap.length],[0,0]);
+      const difference=faceDepth(faces[i],point)-faceDepth(faces[j],point);
+      if(Math.abs(difference)<1e-5)continue;
+      const far=difference>0?i:j,near=difference>0?j:i;
+      if(!following[far].has(near)){following[far].add(near);incoming[near]++;}
+    }
+    const queue=faces.map((_,index)=>index).filter(index=>incoming[index]===0),order=[];
+    while(queue.length){
+      const index=queue.shift();order.push(index);
+      for(const next of following[index])if(--incoming[next]===0)queue.push(next);
+    }
+    const unresolved=faces.length-order.length;
+    if(unresolved)for(let i=0;i<faces.length;i++)if(!order.includes(i))order.push(i);
+    return `<g data-scene="carcass" data-face-count="${faces.length}" data-unresolved-order="${unresolved}">`+order.map(index=>{
+      const face=faces[index];
+      return `<g class="diagram-part${face.active?' is-current':''}" data-part="${face.id}" data-face-axis="${face.axis}">`+shape(face.points,face.fill,face.stroke)+'</g>';
+    }).join('')+'</g>';
   }
   function callout(number,target,labelPoint,suffix='',size=40){
     const radius=size*.9;
@@ -36,7 +108,7 @@
   }
   function wrapper(body,viewBox,title,extraNote='',lying=true){
     const [x,y,w,h]=viewBox;
-    const footer=lying?orientation(x+65,y+h-84):'';
+    const footer=lying?orientation(x+65,y+h-(extraNote?112:84)):'';
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox.join(' ')}" role="group" aria-label="${title}" style="font-family:Arial,sans-serif">${defs}${body}${footer}${extraNote?`<text x="${x+w/2}" y="${y+h-12}" text-anchor="middle" font-size="22" fill="#626D5A">${extraNote}</text>`:''}</svg>`;
   }
   function preparation(){
@@ -56,7 +128,7 @@
     if(key==='preparation')return preparation();
     if(key==='raise'){
       let b='<path d="M560 50L605 35L605 648L560 660Z" fill="#E9EDE1" stroke="#A5AD9D" stroke-width="2"/><text x="585" y="15" font-size="25" text-anchor="middle" fill="#626D5A">Стена</text><g transform="translate(65 129) scale(.72)">';
-      for(const panel of parts)b+=board(panel,false);
+      b+=scene(parts);
       b+='</g>';
       const person=(x,flip)=>`<g transform="translate(${x} 415) scale(${flip} 1)" stroke="#617450" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="0" cy="-35" r="23" fill="#E5EDDB" stroke-width="3"/><path d="M-18 0L-24 110H23L18 0Z" fill="#E5EDDB" stroke-width="3"/><path d="M-12 112L-30 233M12 112L39 233M-18 12L-43 80M18 12L75 51"/></g>`;
       b+=person(105,1)+person(666,-1);
@@ -109,23 +181,22 @@
       return wrapper(b,[0,0,width,narrow?1980:750],titles.adjust,'',false);
     }
     if(key==='doors'){
-      let b='';
-      for(const panel of parts)b+=board(panel,false);
+      const closedParts=parts.slice();
       for(const [col,x]of[2,402.5,803].entries()){
-        b+=board([13-col,x,16,-16.5,395,445,16,0],false);
-        b+=board([4+col,x,465,-16.5,395,1565,16,0],false);
+        closedParts.push([13-col,x,16,-16.5,395,445,16,0],[4+col,x,465,-16.5,395,1565,16,0]);
       }
+      let b=scene(closedParts);
       for(const x of[347,747,847])b+='<g class="diagram-part" data-part="Ф15">'+segment(project(x,690,-29),project(x,1230,-29),'#252D25','stroke-width="5.2" stroke-linecap="round"')+'</g>';
       return wrapper(b,[35,-70,690,920],titles.doors,'Три больших и три малых фасада.',false);
     }
     if(key==='base'){
-      let b=board([19,16,2020,307.5,1168,79.5,16,1],true)+board([19,16,2020,16,1168,79.5,16,1],true)+board([8,16,1700,0,1168,16,383.5,1],true);
+      let b=scene([[19,16,2020,307.5,1168,79.5,16,1],[19,16,2020,16,1168,79.5,16,1],[8,16,1700,0,1168,16,383.5,1]],()=>true);
       b+=callout(8,project(730,1700,80),[590,548],'',32);
       b+=callout(19,project(850,2040,307.5),[655,644],'',32);
       b+=callout(19,project(250,2040,16),[110,728],'',32);
       b+=segment([300,624],[300,670],'#617D50','marker-end="url(#vileta-arrow)" stroke-dasharray="6 5"');
       b+=segment([470,604],[470,640],'#617D50','marker-end="url(#vileta-arrow)" stroke-dasharray="6 5"');
-      b+='<text x="380" y="507" text-anchor="middle" font-size="25" fill="#445845">Задний цоколь утоплен на 5–6 см</text><text x="590" y="695" text-anchor="middle" font-size="25" fill="#445845">Зад</text><text x="250" y="770" text-anchor="middle" font-size="25" fill="#445845">Перед</text>';
+      b+='<text x="380" y="507" text-anchor="middle" font-size="25" fill="#445845">Положение цоколей — по заводским отверстиям</text><text x="590" y="695" text-anchor="middle" font-size="25" fill="#445845">Зад</text><text x="250" y="770" text-anchor="middle" font-size="25" fill="#445845">Перед</text>';
       return wrapper(b,[45,480,665,410],titles.base);
     }
     if(key==='hinges'){
@@ -142,17 +213,14 @@
       return wrapper(b,[10,65,940,710],titles.hinges,'',false);
     }
     if(key==='rod'){
-      let b='';
-      for(const panel of parts)b+=board(panel,false);
-      b+='<g class="diagram-part" data-part="23">'+segment(project(408,580,190),project(1184,580,190),'#617D50','stroke-width="9" stroke-linecap="round"')+'</g>';
-      b+=board(parts.find(p=>p[0]===3),false)+board(parts.find(p=>p[0]===2),false);
+      let b=scene([...parts,[23,408,580,190,776,15,15,8]],panel=>panel[0]===23);
       b+=callout(23,project(930,580,190),[665,200]);
       b+=segment([460,175],[460,208],'#617D50','marker-end="url(#vileta-arrow)" stroke-dasharray="5 5"');
       return wrapper(b,[35,-70,690,920],titles.rod,'Высота штанги — по заводской схеме.',false);
     }
     if(key==='back'){
       let back='<g transform="translate(-5 65) scale(.64)" opacity=".6">';
-      for(const panel of parts)back+=board(panel,false);
+      back+=scene(parts);
       back+=shape([project(0,0,388),project(1200,0,388),project(1200,2016,388),project(0,2016,388)],'#C1D3AF','#607A51')+'</g>';
       back+='<text x="245" y="555" text-anchor="middle" font-size="24" fill="#445845">Задняя область корпуса</text>';
       back+='<text x="675" y="64" text-anchor="middle" font-size="24" fill="#445845">Отдельные листы ДВП</text>';
@@ -165,8 +233,7 @@
     }
     const stage=stages[key];
     if(!stage)return '';
-    let body='';
-    for(const b of parts)if(b[7]<=stage)body+=board(b,b[7]===stage);
+    let body=scene(parts.filter(panel=>panel[7]<=stage),panel=>panel[7]===stage);
     {
       const labels={
         base:[[8,[730,2004,80],[590,638]],[19,[340,2050,16],[110,732],'×2']],
@@ -182,7 +249,63 @@
     }
     if(key==='base')return wrapper(body,[45,580,665,300],titles[key]);
     const note=key==='loose-shelves'?'Уровни полок и ребра — по сверловке оригинала.':'';
-    return wrapper(body,[35,-70,690,920],titles[key],note);
+    return wrapper(body,[35,-100,690,970],titles[key],note);
+  }
+  function renderJointDiagram(type){
+    const narrow=typeof window.matchMedia==='function'&&window.matchMedia('(max-width:760px)').matches;
+    const text=(x,y,value,size=27)=>`<text x="${x}" y="${y}" text-anchor="middle" font-size="${size}" fill="#445845">${value}</text>`;
+    const panel=(x,y,w,h)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#F5F8EF" stroke="#617450" stroke-width="2"/>`;
+    const line=(a,b,extra='')=>{
+      const color=extra.match(/(?:^|\s)stroke="([^"]+)"/)?.[1]||'#617450';
+      return segment(a,b,color,extra.replace(/\bstroke="[^"]*"/,''));
+    };
+    const screw=(x,y)=>{
+      let drawing=`<path d="M${x} ${y-12}H${x+4}L${x+20} ${y-7}H${x+98}V${y+7}H${x+20}L${x+4} ${y+12}H${x}Z" fill="#C9D8B8" stroke="#445845" stroke-width="2"/>`;
+      for(let step=30;step<96;step+=11)drawing+=line([x+step,y+7],[x+step+6,y-7]);
+      return drawing;
+    };
+    if(type==='glide'){
+      let body=panel(105,85,510,198)+`<path d="M105 251H615" stroke="#9BAB8B" stroke-width="2"/>`;
+      body+=`<rect x="252" y="346" width="218" height="20" rx="3" fill="#D5E2C6" stroke="#617450" stroke-width="2"/>`;
+      body+=line([361,327],[361,296],'marker-end="url(#vileta-arrow)" stroke-width="3"');
+      body+=text(360,49,'Нижняя кромка панели',29)+text(360,415,'Подпятник Ф10 · артикул 10005',29);
+      body+=text(360,465,'Плашка располагается под нижней кромкой.',24)+text(360,503,'Способ фиксации в PDF не показан.',24);
+      return wrapper(body,[0,0,720,550],'Подпятник под нижней кромкой панели','',false).replace('<svg ','<svg data-joint-type="glide" ');
+    }
+    if(!['confirmat','cam-dowel'].includes(type))return '';
+    const confirmat=type==='confirmat';
+    const headings=confirmat?['1. Совместите детали','2. Введите конфирмат','3. Стяните соединение']:['1. Установите элементы','2. Соедините панели','3. Зафиксируйте узел'];
+    const captions=confirmat?[['По готовым','отверстиям'],['Ф4 · 7 × 50 мм','в торец второй панели'],['Подтяните вручную','шестигранным ключом']]:[['Шток, шкант','и круглый эксцентрик'],['Шток входит','в эксцентрик'],['Поверните эксцентрик','до фиксации']];
+    let body='';
+    for(let i=0;i<3;i++){
+      const offsetX=narrow?0:i*460,offsetY=narrow?i*610:0;
+      body+=`<g transform="translate(${offsetX} ${offsetY})">`+text(225,40,headings[i],28);
+      if(confirmat){
+        body+=panel(120,130,32,282)+panel(i===0?186:152,250,i===0?240:274,32);
+        body+=line([55,266],[430,266],'stroke-dasharray="6 6" stroke="#9DAA91"');
+        if(i===1){body+=screw(59,266);body+=line([45,215],[109,215],'marker-end="url(#vileta-arrow)" stroke-width="3"');}
+        if(i===2){body+=screw(120,266);body+=`<path d="M120 266H99V208H63" fill="none" stroke="#617450" stroke-width="7" stroke-linejoin="round"/>`;}
+        if(i===0)body+=line([174,308],[155,308],'marker-end="url(#vileta-arrow)" stroke-width="3"');
+      }else{
+        const left=i===0?195:96,camX=left+78;
+        body+=panel(64,128,32,284)+panel(left,210,230,120);
+        body+=`<path d="M96 244H${i===0?163:camX}V256H96Z" fill="#CAD7BB" stroke="#617450" stroke-width="2"/><path d="M96 295H${i===0?159:178}V309H96Z" fill="#D6BD92" stroke="#917C57" stroke-width="2"/>`;
+        for(let x=110;x<150;x+=12)body+=line([x,295],[x,309],'stroke="#A58C62"');
+        body+=`<circle cx="${camX}" cy="250" r="30" fill="#DFE9D3" stroke="#445845" stroke-width="2.5"/><path d="M${camX-11} 241H${camX+11}M${camX} 231V251" stroke="#617450" stroke-width="3"/>`;
+        if(i<2)body+=`<path d="M${camX+10} 265H${camX-12}M${camX-4} 257L${camX-12} 265L${camX-4} 273" fill="none" stroke="#617450" stroke-width="2"/>`;
+        if(i===0){body+=line([165,250],[193,250],'stroke-dasharray="4 4"');body+=line([161,302],[193,302],'stroke-dasharray="4 4"');body+=line([269,381],[215,381],'marker-end="url(#vileta-arrow)" stroke-width="3"');}
+        if(i===2)body+=`<path d="M${camX-34} 207A55 55 0 1 1 ${camX+49} 281M${camX+49} 267V281H${camX+63}" fill="none" stroke="#617450" stroke-width="3" stroke-linecap="round"/>`;
+      }
+      body+=text(225,490,captions[i][0])+text(225,528,captions[i][1]);
+      body+='</g>';
+    }
+    const width=narrow?460:1380,footerY=narrow?1875:620;
+    const notes=confirmat?['Схематичный разрез одного узла.','Используйте только заводские отверстия.']:['До совмещения стрелка эксцентрика направлена к входу штока.','Поверните до фиксации. Не затягивайте с усилием.'];
+    if(narrow&&type==='cam-dowel'){
+      ['До совмещения стрелка —','к входу штока.','Поверните до фиксации.','Не затягивайте с усилием.'].forEach((value,index)=>{body+=text(width/2,footerY+index*33,value,22);});
+    }else notes.forEach((value,index)=>{body+=text(width/2,footerY+index*36,value,narrow?22:27);});
+    return wrapper(body,[0,0,width,narrow?2000:720],confirmat?'Как работает соединение конфирматом':'Как работает эксцентрик со шкантом','',false).replace('<svg ',`<svg data-joint-type="${type}" `);
   }
   window.renderDiagram=renderDiagram;
+  window.renderJointDiagram=renderJointDiagram;
 })();
