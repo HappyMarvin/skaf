@@ -16,12 +16,15 @@ test('confirmed step quantities remain separate from the whole hardware kit',asy
   await expect(page.locator('.part-chip[data-part-dialog="Ф4"]')).toContainText('× 14');
   await expect(page.locator('.part-chip[data-part-dialog="Ф8"]')).toContainText('× 6');
   await expect(page.locator('.part-chip[data-part-dialog="Ф9"]')).toContainText('× 6');
-  // The screws through the divider must remain reachable before the left shelves close access.
-  await expect(page.locator('.step-instructions li').first()).toContainText('широкие полки №9 и №10');
+  // Prepare the underside before it becomes inaccessible; keep divider screws reachable until fastened.
+  await expect(page.locator('.step-instructions li').first()).toContainText('штока Ф8 в готовые отверстия снизу полки №10');
   const actions=await page.locator('.step-instructions li').allTextContents();
+  const prepareLower=actions.findIndex(text=>text.includes('штока Ф8 в готовые отверстия снизу полки №10'));
+  const installWide=actions.findIndex(text=>text.includes('установите широкие полки №9 и №10'));
   const fastenWide=actions.findIndex(text=>text.includes('затяните крепления №9/10'));
   const prepareLeft=actions.findIndex(text=>text.includes('Теперь найдите 2 узкие полки №17'));
-  expect(fastenWide).toBeGreaterThanOrEqual(0);
+  expect(installWide).toBeGreaterThan(prepareLower);
+  expect(fastenWide).toBeGreaterThanOrEqual(installWide);
   expect(prepareLeft).toBeGreaterThan(fastenWide);
   await expect(page.locator('.part-chip[data-part-dialog="Ф8"]')).toContainText('внутренних торцов №17');
   await page.locator('.part-chip[data-part-dialog="17"]').click();
