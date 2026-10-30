@@ -13,8 +13,21 @@ test('confirmed step quantities remain separate from the whole hardware kit',asy
   await page.goto('./#step/remaining');
   await expect(page.locator('.part-chip[data-part-dialog="Ф4"]')).not.toContainText('× 52');
   await page.goto('./#step/main-shelves');
-  await expect(page.locator('.step-instructions li').first()).toContainText('левые полки №17');
-  await expect(page.locator('.step-instructions li').nth(1)).toContainText('широких полок №9');
+  await expect(page.locator('.part-chip[data-part-dialog="Ф4"]')).toContainText('× 14');
+  await expect(page.locator('.part-chip[data-part-dialog="Ф8"]')).toContainText('× 6');
+  await expect(page.locator('.part-chip[data-part-dialog="Ф9"]')).toContainText('× 6');
+  // The screws through the divider must remain reachable before the left shelves close access.
+  await expect(page.locator('.step-instructions li').first()).toContainText('широкие полки №9 и №10');
+  const actions=await page.locator('.step-instructions li').allTextContents();
+  const fastenWide=actions.findIndex(text=>text.includes('затяните крепления №9/10'));
+  const prepareLeft=actions.findIndex(text=>text.includes('Теперь найдите 2 узкие полки №17'));
+  expect(fastenWide).toBeGreaterThanOrEqual(0);
+  expect(prepareLeft).toBeGreaterThan(fastenWide);
+  await expect(page.locator('.part-chip[data-part-dialog="Ф8"]')).toContainText('внутренних торцов №17');
+  await page.locator('.part-chip[data-part-dialog="17"]').click();
+  await expect(page.locator('#help-dialog')).toContainText('Полка2');
+  await expect(page.locator('#help-dialog')).toContainText('Круглые эксцентриковые посадки обращены к высокой стойке №3');
+  await expect(page.locator('#help-dialog')).toContainText('двумя конфирматами');
 });
 
 test('connection explanations open separately and remain large on a phone',async({page})=>{
