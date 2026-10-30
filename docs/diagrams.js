@@ -255,7 +255,66 @@
     const note=key==='dividers'?'Пунктир — задний цоколь под дном.':key==='loose-shelves'?'Уровни полок и ребра — по сверловке оригинала.':'';
     return wrapper(body,[35,-100,690,970],titles[key],note);
   }
+  function hingeWalkthrough(type){
+    const stage=['hinge-position','hinge-seat','hinge-fasten','hinge-check'].indexOf(type);
+    if(stage<0)return '';
+    // One unmeasured door fragment, viewed from the inside. The hinge profile follows the PDF photo.
+    const p=(x,y,z=0)=>[190+.88*x-.34*y,55+.19*x+.66*y-z];
+    const poly=(points,fill,stroke='#718166',extra='')=>`<polygon points="${pointList(points)}" fill="${fill}" stroke="${stroke}" stroke-width="2" stroke-linejoin="round" ${extra}/>`;
+    const plane='matrix(.88 .19 -.34 .66 190 55)';
+    const model=(body,rise=0)=>`<g transform="translate(0 ${-rise})"><g transform="${plane}">${body}</g></g>`;
+    const lift=stage===1?95:0;
+    const colors={cup:'#D1DFC5',ears:'#E8D7B3',arm:'#C6D9DD',plate:'#DCCFDD'};
+    const circle=(x,y,r,fill,stroke='#67776C',extra='')=>`<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="2" ${extra}/>`;
+    let b=poly([p(-18,-18,-28),p(430,-18,-28),p(430,432,-28),p(-18,432,-28)],'#E8E3D8','#C9C2B5','class="hinge-soft-pad"');
+    b+=`<path d="M${p(-10,420,-28).join(' ')}L${p(420,420,-28).join(' ')}" stroke="#CCC4B5" stroke-width="3" stroke-dasharray="3 8"/>`;
+    b+=poly([p(410,0),p(410,410),p(410,410,-16),p(410,0,-16)],'#CAD1C4');
+    b+=poly([p(0,410),p(410,410),p(410,410,-16),p(0,410,-16)],'#DFE3D8');
+    b+=poly([p(0,0),p(410,0),p(410,410),p(0,410)],'#F7FAF1','#718166','class="hinge-door-inner"');
+    b+=`<path class="hinge-door-edge" d="M${p(410,0).join(' ')}L${p(410,410).join(' ')}" fill="none" stroke="#445845" stroke-width="3"/>`;
+    b+=model(circle(355,205,46,'#B4A180','#887856','class="hinge-door-recess"')+`<path d="M317 195C329 169 376 161 394 192" fill="none" stroke="#8A795C" stroke-width="7"/><path d="M324 223Q354 250 389 220" fill="none" stroke="#D4C39D" stroke-width="4"/>`+circle(355,127,5,'#897B60')+circle(355,283,5,'#897B60'));
+    if(stage>0){
+      let h='';
+      // Mounting plate remains joined to the arm and extends beyond the door's hinge edge.
+      h+=model(`<g class="hinge-mounting-plate" data-hinge-component="plate"><path d="M540 145H600Q610 145 610 155V175H628V235H610V255Q610 265 600 265H540Q530 265 530 255V235H516V175H530V155Q530 145 540 145Z" fill="${colors.plate}" stroke="#6E7470" stroke-width="2.5"/><rect x="545" y="155" width="43" height="15" rx="7" fill="#F7F6F2" stroke="#788078" stroke-width="2"/><rect x="545" y="240" width="43" height="15" rx="7" fill="#F7F6F2" stroke="#788078" stroke-width="2"/><path d="M537 177V231M606 177V231" stroke="#F3F3F0" stroke-width="3"/></g>`);
+      if(stage===1){
+        const arc=(z,reverse=false)=>Array.from({length:21},(_,i)=>{const t=(reverse?20-i:i)*Math.PI/20;return p(355+47*Math.cos(t),205+47*Math.sin(t),z);});
+        h+=poly([...arc(0),...arc(-29,true)],'#A9B5AE','#65766A','class="hinge-cup-outer-wall"');
+      }
+      h+=model(`<g class="hinge-cup-flange"><path d="M326 105H384Q393 105 393 114V151Q415 170 415 205Q415 240 393 260V296Q393 305 384 305H326Q317 305 317 296V260Q295 240 295 205Q295 170 317 151V114Q317 105 326 105Z" fill="#D9DFD9" stroke="#65766A" stroke-width="2.5"/><path d="M325 112H385M325 298H385" stroke="#F6F8F3" stroke-width="4"/></g>`);
+      h+=model(`<g data-hinge-component="ears"><rect x="319" y="106" width="73" height="45" rx="9" fill="${colors.ears}" stroke="#7A7869" stroke-width="2"/><rect x="319" y="260" width="73" height="45" rx="9" fill="${colors.ears}" stroke="#7A7869" stroke-width="2"/>${circle(355,127,12,'#F7FAF1','#7A7869','class="hinge-ear-hole"')}${circle(355,283,12,'#F7FAF1','#7A7869','class="hinge-ear-hole"')}</g>`);
+      h+=model(`<g data-hinge-component="cup">${circle(355,205,47,colors.cup,'#60765A','class="hinge-cup-rim"')}<rect x="319" y="168" width="74" height="75" rx="22" fill="#687970" stroke="#53665A" stroke-width="2"/><path d="M326 190Q326 180 339 180H374Q385 180 385 192V222Q385 232 373 232H339Q326 232 326 222Z" fill="#AAB9AF" stroke="#DCE5DB" stroke-width="2"/><path d="M333 224H378" stroke="#E5ECE3" stroke-width="3"/></g>`);
+      h+=model(`<path d="M396 178L427 182L438 196V216L427 230L396 234L403 219V191Z" fill="#A9B6AD" stroke="#64766B" stroke-width="2"/>${circle(421,205,13,'#CBD6CC','#64766B')}<path d="M416 202H426" stroke="#6A7B70" stroke-width="2"/>`,6);
+      const top=[[416,177],[630,177],[630,233],[416,233]];
+      h+=poly([p(416,233,18),p(630,233,18),p(630,233),p(416,233)],'#A3B2A8','#687C6F');
+      h+=poly([p(630,177,18),p(630,233,18),p(630,233),p(630,177)],'#99AAA0','#687C6F','class="hinge-arm-end"');
+      h+=model(`<g data-hinge-component="arm">${poly(top.map(a=>a),colors.arm,'#657B73')}<path d="M430 185H619M430 225H619" stroke="#EFF6F1" stroke-width="3"/><rect x="541" y="190" width="45" height="27" rx="9" fill="#3D4C45" stroke="#85968B" stroke-width="3"/>${[482,608].map(x=>circle(x,205,14,'#CDD4CF','#7C8780','class="hinge-arm-screw"')+`<path d="M${x-8} 205H${x+8}M${x} 197V213" stroke="#75817A" stroke-width="3"/>`).join('')}</g>`,18);
+      if(stage>=2){
+        for(const [index,y]of [127,283].entries()){
+          const base=p(355,y),raised=stage===2&&index===1?28:3,head=p(355,y,raised);
+          if(raised>3){h+=`<path d="M${head[0]-3} ${head[1]+2}V${base[1]}H${head[0]+3}V${head[1]+2}" fill="#A4B1A8" stroke="#64776A" stroke-width="1.5"/>`;for(let t=head[1]+8;t<base[1]-1;t+=6)h+=`<path d="M${head[0]-4} ${t}L${head[0]+4} ${t-3}" stroke="#64776A" stroke-width="1.5"/>`;}
+          h+=`<g class="hinge-ear-fastener"><ellipse cx="${head[0]}" cy="${head[1]}" rx="10" ry="6" fill="#D5DDD6" stroke="#445E4B" stroke-width="2"/><path d="M${head[0]-6} ${head[1]}H${head[0]+6}M${head[0]} ${head[1]-4}V${head[1]+4}" stroke="#445E4B" stroke-width="2"/></g>`;
+        }
+      }
+      b+=`<g class="hinge-assembly" transform="translate(0 ${-lift})">${h}</g>`;
+      if(stage===1){const c=p(355,205);b+=segment([c[0],c[1]-43],[c[0],c[1]-12],'#445845','marker-end="url(#vileta-arrow)" stroke-width="4"');}
+      if(stage===2){
+        const tip=p(355,283,30);
+        b+=`<g class="hinge-screwdriver"><path class="hinge-driver-tip" d="M${tip[0]} ${tip[1]}V${tip[1]-66}" stroke="#718278" stroke-width="7"/><path d="M${tip[0]} ${tip[1]-66}V${tip[1]-123}" stroke="#445845" stroke-width="22" stroke-linecap="round"/><path d="M${tip[0]-4} ${tip[1]-76}V${tip[1]-112}" stroke="#8FA383" stroke-width="3"/></g>`;
+      }
+      if(stage===1){
+        const badge=(mark,target,position,color)=>segment(target,position,color,'stroke-width="2"')+`<circle cx="${position[0]}" cy="${position[1]}" r="26" fill="${color}"/><text x="${position[0]}" y="${position[1]+12}" text-anchor="middle" fill="#fff" font-size="35" font-weight="600">${mark}</text>`;
+        b+=badge('А',p(340,222,lift),[290,342-lift],'#526F43');
+        b+=badge('Б',p(355,283,lift),[492,385-lift],'#82632C');
+        b+=badge('В',p(500,205,lift+18),[610,175-lift],'#456775');
+        b+=badge('Г',p(570,258,lift),[736,374-lift],'#735C78');
+      }
+    }
+    const titles=['Фасад лицом вниз','Опустите чашку','Закрепите два ушка','Проверьте посадку'];
+    return wrapper(b,[230,30,550,440],titles[stage],'',false).replace('<svg ',`<svg data-joint-type="${type}" data-hinge-stage="${stage+1}" `);
+  }
   function renderJointDiagram(type){
+    if(type.startsWith('hinge-'))return hingeWalkthrough(type);
     const narrow=typeof window.matchMedia==='function'&&window.matchMedia('(max-width:760px)').matches;
     const text=(x,y,value,size=27)=>`<text x="${x}" y="${y}" text-anchor="middle" font-size="${size}" fill="#445845">${value}</text>`;
     const panel=(x,y,w,h)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#F5F8EF" stroke="#617450" stroke-width="2"/>`;

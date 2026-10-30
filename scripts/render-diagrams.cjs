@@ -44,6 +44,12 @@ for (const mobile of [false,true]) {
     if (!check) fs.writeFileSync(previews+'/'+name+'.png',png);
   }
 }
+for (const type of ['hinge-position','hinge-seat','hinge-fasten','hinge-check']) {
+  const svg=context.window.renderJointDiagram(type);
+  if(!svg || /<image|\.(?:png|jpe?g|webp)/i.test(svg))throw new Error('Invalid hinge illustration: '+type);
+  const png=new Resvg(svg,{background:'#F7F6F2'}).render().asPng();
+  if(!check){fs.writeFileSync(root+'/docs/assets/joint-'+type+'.svg',svg);fs.writeFileSync(previews+'/joint-'+type+'.png',png);}
+}
 for(const [name,svg]of [['diagram-base-top',context.window.renderBaseTopDiagram()],['diagram-base-top-left',context.window.renderBaseTopInset('left')],['diagram-base-top-right',context.window.renderBaseTopInset('right')]]){
   if (/<image|\.(?:png|jpe?g|webp)/i.test(svg)) throw new Error('Raster reference in '+name);
   for(const match of svg.matchAll(/data-part="([^"]+)"/g))if(!knownParts.has(match[1]))throw new Error('Unknown part in '+name);
@@ -51,4 +57,4 @@ for(const [name,svg]of [['diagram-base-top',context.window.renderBaseTopDiagram(
   if(!check)fs.writeFileSync(root+'/docs/assets/'+name+'.svg',svg);
   if(!check)fs.writeFileSync(previews+'/'+name+'.png',png);
 }
-console.log('13 assembly SVG, 6 joint SVG and 3 bottom-panel views rendered.');
+console.log('13 assembly SVG, 6 joint SVG, 4 hinge walkthrough SVG and 3 bottom-panel views rendered.');

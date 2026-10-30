@@ -83,12 +83,21 @@
     const drawingItems=[assembly.querySelector('.diagram-card'),assembly.querySelector('.diagram-result'),assembly.querySelector('.vector-note'),assembly.querySelector('.diagram-inspector')].filter(Boolean);
     assembly.prepend(drawingColumn);drawingItems.forEach(item=>drawingColumn.append(item));
     if(step.id==='base') setupBaseViews(drawingColumn);
+    if(step.walkthrough) drawingColumn.insertAdjacentHTML('afterend',walkthroughMarkup(step.walkthrough));
     if(step.joints?.length){const helpers=document.createElement('div');helpers.className='joint-help';helpers.innerHTML=step.joints.map(type=>`<button data-joint="${escape(type)}">${escape(jointLabels[type])}<span aria-hidden="true">↗</span></button>`).join('');document.querySelector('.part-help-link').after(helpers);}
     const source = document.querySelector('.step-source');
     if (source) { const detail = document.createElement('details'); detail.className='source-detail'; detail.innerHTML=`<summary>Источник и оригинальная инструкция</summary><p>${sourceLabel(step)}</p>${data.pdf ? `<p><a href="${escape(data.pdf.url)}" target="_blank" rel="noopener">Открыть полный PDF ↗</a></p>` : ''}`; source.replaceWith(detail); }
     if (step.sourceNote) { const detail=document.querySelector('.source-detail'); if(detail) { const note=document.createElement('p'); note.textContent=step.sourceNote; detail.append(note); } }
     document.querySelector('#mobile-steps').addEventListener('change', e => { location.hash = stepUrl(e.target.value); });
   }
+
+  function walkthroughCopy(walkthrough,card){
+    return `<p>${escape(card.text)}</p>${card.note?`<p class="walkthrough-note">${escape(card.note)}</p>`:''}${card.anatomy?`<dl class="walkthrough-anatomy">${walkthrough.anatomy.map(item=>`<div><dt><span class="hinge-mark hinge-mark--${escape(item.kind)}">${escape(item.mark)}</span></dt><dd>${escape(item.text)}</dd></div>`).join('')}</dl>`:''}`;
+  }
+  function walkthroughMarkup(walkthrough){
+    return `<section class="hinge-walkthrough" aria-labelledby="hinge-walkthrough-title"><h2 id="hinge-walkthrough-title">${escape(walkthrough.title)}</h2><p class="walkthrough-intro">${escape(walkthrough.intro)}</p><div class="walkthrough-grid">${walkthrough.steps.map((card,index)=>`<article class="walkthrough-card" data-walkthrough="${escape(card.diagramKey)}"><h3><span>${index+1}</span>${escape(card.title)}</h3><div class="walkthrough-art">${window.renderJointDiagram(card.diagramKey)}</div><div class="walkthrough-copy">${walkthroughCopy(walkthrough,card)}</div><button class="walkthrough-zoom-button" data-joint="${escape(card.diagramKey)}" aria-label="Увеличить: ${escape(card.title)}">${icon('expand')} Увеличить</button></article>`).join('')}</div></section>`;
+  }
+  function currentWalkthroughCard(){return currentStep()?.walkthrough?.steps.find(card=>card.diagramKey===activeZoomJoint);}
 
   function baseTopMarkup(options={}){
     return `<h3 class="base-top-title">Дно №8 · вид сверху</h3><p class="base-top-orientation">Зад — сверху, перед — снизу</p>${window.renderBaseTopDiagram(options)}<div class="base-top-insets"><h3>Задний ряд крупнее · для шага 4</h3>${['left','right'].map(side=>`<figure>${window.renderBaseTopInset(side)}<figcaption><strong>${side==='left'?'Слева':'Справа'} на фото</strong><span>Для заднего цоколя — крайнее ${side==='left'?'слева':'справа'}</span></figcaption></figure>`).join('')}</div><div class="base-top-legend"><span>Для цоколей — 4 отверстия:</span><span><i class="plinth-dot"></i>Передний — 2 сейчас</span><span><i class="later-dot"></i>Задний — 2 на шаге 4</span><span><i class="other-dot"></i>Другие отверстия — 6: в этом шаге не используются</span></div><p class="base-top-strip-note">Пунктирные полосы показывают планки <strong>под дном</strong>, а не пазы на поверхности. Переднюю закрепите сейчас 2 конфирматами, заднюю — после стойки №3 на шаге 4.</p><p class="base-top-caption">Расположение приблизительное, по фото детали. Это не шаблон для сверления.</p>`;
@@ -253,7 +262,7 @@
   document.addEventListener('click', event => {
     const viewTarget=event.target.closest('[data-base-view]');if(viewTarget){setBaseDiagramView(viewTarget.dataset.baseView);return;}
     const jointTarget=event.target.closest('[data-joint]');
-    if(jointTarget){activeZoomJoint=jointTarget.dataset.joint;zoom=1;document.querySelector('#zoom-content').innerHTML=window.renderJointDiagram(activeZoomJoint);document.querySelector('#zoom-title').textContent=jointLabels[activeZoomJoint];document.querySelector('#zoom-dialog .diagram-inspector')?.remove();updateZoom();document.querySelector('#zoom-dialog').showModal();return;}
+    if(jointTarget){activeZoomJoint=jointTarget.dataset.joint;const card=currentWalkthroughCard();zoom=1;document.querySelector('#zoom-content').innerHTML=window.renderJointDiagram(activeZoomJoint);document.querySelector('#zoom-title').textContent=card?.title||jointLabels[activeZoomJoint];document.querySelector('#zoom-dialog .diagram-inspector')?.remove();updateZoom();document.querySelector('#zoom-dialog').showModal();return;}
     const partTarget=event.target.closest('[data-select-part],svg [data-part]');
     if(partTarget) { selectDiagramPart(partTarget.dataset.selectPart || partTarget.dataset.part,partTarget.closest('.zoom-dialog,.assembly-layout')); return; }
     const detailTarget=event.target.closest('[data-part-dialog]');
@@ -297,13 +306,17 @@
   document.querySelector('.skip-link').addEventListener('click',event=>{event.preventDefault();main.focus();main.scrollIntoView();});
   function updateZoom() {
     const dialog=document.querySelector('#zoom-dialog');
+    const walkthroughCard=currentWalkthroughCard();
+    let copy=dialog.querySelector('.zoom-walkthrough-copy');
+    dialog.classList.toggle('walkthrough-zoom',Boolean(walkthroughCard));
+    if(walkthroughCard){if(!copy){copy=document.createElement('div');copy.className='zoom-walkthrough-copy walkthrough-copy';dialog.querySelector('.zoom-header').after(copy);}copy.innerHTML=walkthroughCopy(currentStep().walkthrough,walkthroughCard);}else copy?.remove();
     const resultText=activeZoomJoint?'':currentStep()?.diagramResult;
     let result=dialog.querySelector('.zoom-result');
     if(resultText){if(!result){result=document.createElement('p');result.className='zoom-result';dialog.querySelector('.zoom-header').after(result);}result.textContent=resultText;}else result?.remove();
     const content = document.querySelector('#zoom-content');
     const topPhone=isBaseTopZoom()&&window.matchMedia('(max-width:760px)').matches;
     content.classList.toggle('base-top-content',isBaseTopZoom());
-    content.style.width = topPhone?`${400*zoom}px`:`${80 * zoom}%`;
+    content.style.width = topPhone?`${400*zoom}px`:`${(walkthroughCard?100:80) * zoom}%`;
     content.style.minWidth = topPhone?'600px':'';
     content.style.maxWidth = topPhone?'none':`${900 * zoom}px`;
     content.querySelectorAll('img,svg').forEach(img => img.style.maxHeight = activeZoomJoint || isBaseTopZoom() || currentStep()?.id==='adjust' ? 'none' : `${700 * zoom}px`);
