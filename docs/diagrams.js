@@ -217,17 +217,7 @@
       return wrapper(b,[35,-70,690,920],titles.rod,'Высота штанги — по заводской схеме.',false);
     }
     if(key==='back'){
-      let back='<g transform="translate(-5 65) scale(.64)" opacity=".6">';
-      back+=scene(parts);
-      back+=shape([project(0,0,388),project(1200,0,388),project(1200,2016,388),project(0,2016,388)],'#C1D3AF','#607A51')+'</g>';
-      back+='<text x="245" y="555" text-anchor="middle" font-size="24" fill="#445845">Задняя область корпуса</text>';
-      back+='<text x="675" y="64" text-anchor="middle" font-size="24" fill="#445845">Отдельные листы ДВП</text>';
-      for(const [i,panel]of[[20,401],[21,398],[22,395]].entries()){
-        const x=500+i*132,w=panel[1]*.1875;
-        back+=`<g class="diagram-part diagram-callout" data-part="${panel[0]}" tabindex="0" role="button" aria-label="Показать задний лист №${panel[0]}"><rect x="${x}" y="157" width="${w}" height="378" fill="#D9E6CD" stroke="#607A51" stroke-width="2"/><circle cx="${x+w/2}" cy="112" r="26" fill="#445845"/><text x="${x+w/2}" y="122" text-anchor="middle" font-size="30" fill="#fff">${panel[0]}</text><text x="${x+w/2}" y="568" text-anchor="middle" font-size="21" fill="#445845">2016 × ${panel[1]}</text><text x="${x+w/2}" y="593" text-anchor="middle" font-size="18" fill="#626D5A">мм</text></g>`;
-      }
-      back+=`<text x="460" y="658" text-anchor="middle" font-size="24" fill="#445845">Порядок листов — по заводской схеме,</text><text x="460" y="690" text-anchor="middle" font-size="24" fill="#445845">сверить до крепления.</text>`;
-      return wrapper(back,[30,20,890,750],titles.back,'',false);
+      return rearBackView();
     }
     const stage=stages[key];
     if(!stage)return '';
@@ -254,6 +244,57 @@
     if(key==='base')return wrapper(body,[45,580,665,300],titles[key]);
     const note=key==='dividers'?'Пунктир — задний цоколь под дном.':key==='loose-shelves'?'Уровни полок и ребра — по сверловке оригинала.':'';
     return wrapper(body,[35,-100,690,970],titles[key],note);
+  }
+  function rearBackView(){
+    const left=80,top=100,width=480,height=810,sx=width/1194,sy=height/2016;
+    const seam1=left+401*sx,seam2=left+796*sx,y9=top+458*sy,y10=top+1691.6*sy;
+    const stripe=(id,x,y,w,h)=>`<g class="diagram-part back-support" data-part="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#back-support-hatch)" stroke="#A4ABA0" stroke-width="2" stroke-dasharray="7 6"/></g>`;
+    let b='<defs><pattern id="back-support-hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><rect width="10" height="10" fill="#F1F2EE" fill-opacity=".8"/><path d="M0 0V10" stroke="#A5ACA1" stroke-width="3"/></pattern></defs>';
+    let x=left;
+    for(const [id,w]of [[20,401],[22,395],[21,398]]){
+      const drawn=w*sx;
+      b+=`<g class="diagram-part back-sheet" data-part="${id}" data-back-sheet="${id}"><rect x="${x}" y="${top}" width="${drawn}" height="${height}" fill="${id===22?'#F8FAF4':'#EAF0E1'}" stroke="#819477" stroke-width="2"/></g>`;
+      x+=drawn;
+    }
+    // Neutral traces show supporting pieces behind the DVP, not fastener positions.
+    b+=stripe(3,seam2-9,top+8,18,height-16);
+    b+=stripe(14,seam1-9,top+16*sy,18,426*sy);
+    b+=stripe(18,seam1-9,top+1707.6*sy,18,296.4*sy);
+    b+=stripe(15,left+4,top+1000*sy,seam2-left-13,199*sy);
+    for(const [id,y]of [[9,y9],[10,y10]]){
+      b+=`<g class="back-shelf-level" data-shelf-level="${id}"><path d="M${left+3} ${y}H${seam2-10}" fill="none" stroke="#A3ACA0" stroke-width="3" stroke-dasharray="10 7"/><text x="${left-24}" y="${y+12}" text-anchor="end" font-size="34" fill="#727D6B">${id}</text></g>`;
+    }
+    b+=`<g class="diagram-part" data-part="24"><rect class="back-profile-strip" x="${seam1-7}" y="${y9}" width="14" height="${y10-y9}" fill="#718E56" stroke="#445845" stroke-width="2"/></g>`;
+    const backCallout=(id,target,position,color)=>segment(target,position,color,'stroke-width="2" pointer-events="none"')+`<g class="diagram-part diagram-callout" data-part="${id}" role="button" tabindex="0" aria-label="Показать деталь №${id}"><circle cx="${position[0]}" cy="${position[1]}" r="58" fill="${color}"/><text x="${position[0]}" y="${position[1]+17}" text-anchor="middle" font-size="48" font-weight="600" fill="#fff">${id}</text></g>`;
+    b+=backCallout(24,[seam1,top+height*.28],[662,240],'#445845');
+    b+=backCallout(3,[seam2,top+height*.74],[662,700],'#68735F');
+    let labelX=left;
+    for(const [id,w]of [[20,401],[22,395],[21,398]]){
+      const center=labelX+w*sx/2,y=top+height*.46;
+      b+=`<g class="diagram-part diagram-callout" data-part="${id}" role="button" tabindex="0" aria-label="Показать лист №${id}, ширина ${w} мм"><rect class="back-label-hitbox" x="${center-60}" y="${y-76}" width="120" height="104" fill="transparent"/><text x="${center}" y="${y}" text-anchor="middle" font-size="64" font-weight="600" fill="#445845">${id}</text></g>`;
+      labelX+=w*sx;
+    }
+    b+=`<g class="diagram-part" data-part="7"><rect x="${left-8}" y="${top-16}" width="${width+16}" height="16" fill="#CBD5C2" stroke="#899B7C" stroke-width="2"/></g><g class="diagram-part" data-part="8"><rect x="${left-8}" y="${top+height}" width="${width+16}" height="16" fill="#CBD5C2" stroke="#899B7C" stroke-width="2"/></g>`;
+    b+=`<text x="${left+width/2}" y="54" text-anchor="middle" font-size="36" fill="#445845">Крыша</text><text x="${left+width/2}" y="975" text-anchor="middle" font-size="36" fill="#445845">Дно</text>`;
+    return wrapper(b,[0,0,760,1030],'Вид сзади: листы 20–22–21, профиль 24 между полками 9 и 10','',false).replace('<svg ','<svg data-back-view="rear" ');
+  }
+  function backProfileDiagram(){
+    let b='<rect x="65" y="155" width="315" height="135" rx="3" fill="#E4ECD9" stroke="#7B906D" stroke-width="3"/><rect x="420" y="155" width="315" height="135" rx="3" fill="#F1F5E9" stroke="#7B906D" stroke-width="3"/>';
+    b+='<rect x="345" y="125" width="110" height="195" rx="5" fill="#D8E4CA" stroke="#607A51" stroke-width="3"/><path d="M345 155H380V290H345M455 155H420V290H455" fill="none" stroke="#8B9C7B" stroke-width="3" stroke-dasharray="8 6"/>';
+    b+=segment([240,225],[335,225],'#445845','marker-end="url(#vileta-arrow)" stroke-width="4"')+segment([560,225],[465,225],'#445845','marker-end="url(#vileta-arrow)" stroke-width="4"');
+    b+='<text x="180" y="100" text-anchor="middle" font-size="44" fill="#445845">20</text><text x="620" y="100" text-anchor="middle" font-size="44" fill="#445845">22</text><text x="400" y="80" text-anchor="middle" font-size="44" fill="#445845">24</text>';
+    return wrapper(b,[0,0,800,380],'Условный принцип: две кромки ДВП входят в профиль с разных сторон','',false).replace('<svg ','<svg data-joint-type="back-profile" ');
+  }
+  function pushLatchDiagram(){
+    // Composition coordinates illustrate direction only; no mounting distances or hole pattern.
+    let b='<rect class="push-shelf" x="90" y="80" width="430" height="235" fill="#EAF1E1" stroke="#B7C4AA" stroke-width="2"/><path class="push-cabinet-outline" d="M75 315V65H535V315H520V80H90V315Z" fill="#CBD7BF" stroke="#849A74" stroke-width="2"/>';
+    b+='<rect class="push-example-door" x="75" y="335" width="460" height="18" fill="#E9DBBF" stroke="#968561" stroke-width="3"/><path d="M493 335H535V353H493" fill="#DBCAA7" stroke="#968561" stroke-width="2"/>';
+    b+='<path class="push-hinge-side" d="M78 301H97V335H113V347H78Z" fill="#D7DBD3" stroke="#8E9887" stroke-width="2"/>';
+    b+='<rect class="push-base" x="432" y="222" width="51" height="85" rx="4" fill="#D8E2CD" stroke="#80956F" stroke-width="2"/><rect class="push-fixed-body" x="440" y="230" width="35" height="75" rx="8" fill="#BED3A8" stroke="#5F7B49" stroke-width="3"/><path class="push-moving-stem" d="M457.5 300V335" fill="none" stroke="#486E7B" stroke-width="10" stroke-linecap="round"/>';
+    b+='<text x="305" y="158" text-anchor="middle" font-size="35" fill="#5D7350">Внутри шкафа</text><text x="80" y="35" font-size="32" fill="#445845">Вид сверху</text>';
+    const badge=(mark,target,at,color)=>segment(target,at,color,'stroke-width="2"')+`<circle cx="${at[0]}" cy="${at[1]}" r="21" fill="${color}"/><text x="${at[0]}" y="${at[1]+11}" text-anchor="middle" font-size="30" fill="#fff">${mark}</text>`;
+    b+=badge('А',[475,265],[570,235],'#526F43')+badge('Б',[457.5,320],[570,307],'#456775')+badge('В',[460,345],[410,390],'#82632C');
+    return wrapper(b,[35,0,585,425],'Пример, вид сверху: толкатель полностью внутри шкафа, шток к двери напротив петель','',false).replace('<svg ','<svg data-joint-type="push-latch" ');
   }
   function hingeWalkthrough(type){
     const stage=['hinge-position','hinge-seat','hinge-fasten','hinge-check'].indexOf(type);
@@ -314,6 +355,8 @@
     return wrapper(b,[230,30,550,440],titles[stage],'',false).replace('<svg ',`<svg data-joint-type="${type}" data-hinge-stage="${stage+1}" `);
   }
   function renderJointDiagram(type){
+    if(type==='back-profile')return backProfileDiagram();
+    if(type==='push-latch')return pushLatchDiagram();
     if(type.startsWith('hinge-'))return hingeWalkthrough(type);
     const narrow=typeof window.matchMedia==='function'&&window.matchMedia('(max-width:760px)').matches;
     const text=(x,y,value,size=27)=>`<text x="${x}" y="${y}" text-anchor="middle" font-size="${size}" fill="#445845">${value}</text>`;
